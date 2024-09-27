@@ -78,7 +78,7 @@ jobs:
       - name: Test
         if: needs.changes.outputs.run_tests
         run: |          
-          /root/.cargo/bin/uv run --cache-dir .cache-uv/ --frozen \
+          uv run --cache-dir .cache-uv/ --frozen \
               pytest tests \
                 --junit-xml junit-${{ matrix.python-version }}-${{matrix.django-version}}.xml \
                 --cov --cov-report xml
