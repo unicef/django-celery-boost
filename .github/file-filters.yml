@@ -1,6 +1,5 @@
 # This is used by the action https://github.com/dorny/paths-filter
 dependencies: &dependencies
-  - 'pdm.lock'
   - 'pyproject.toml'
 
 python: &python
@@ -22,9 +21,6 @@ run_tests:
   - 'pytest.ini'
   - '.github/workflows/test.yml'
   - '.github/file-filters.yml'
-
-migrations:
-  - added|modified: 'src/**/migrations/*'
 
 lint:
   -  *python

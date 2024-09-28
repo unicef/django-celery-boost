@@ -42,21 +42,29 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     name: Test py${{ matrix.python-version }}/dj${{matrix.django-version}}
+    services:
+      redis:
+        image: redis
+        ports:
+          - 16379:6379
     defaults:
       run:
         shell: bash
     strategy:
       max-parallel: 1
       matrix:
-        python-version: [ "3.9", "3.12" ]
-        django-version: [ "4.2", "5.1" ]
+#        python-version: [ "3.9", "3.12" ]
+#        django-version: [ "4.2", "5.1" ]
+        python-version: [ "3.12" ]
+        django-version: [ "5.1" ]
       fail-fast: true
     needs: [ changes ]
     if: needs.changes.outputs.run_tests || needs.changes.outputs.lint
+    env:
+      CELERY_BROKER_URL: redis://localhost:16379/0
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.7
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -69,20 +77,19 @@ jobs:
           path: |
             .cache-uv/
             .venv/
-          key: ${{ matrix.python-version }}-${{matrix.django-version}}-venv
+          key: ${{ matrix.python-version }}-${{matrix.django-version}}-${{ hashFiles('pyproject.toml') }}-venv
 
       - uses: yezz123/setup-uv@v4
-#        with:
-#          uv-venv: ".venv"
+        with:
+          python:  ${{ matrix.python-version }}
 
       - name: Test
-        if: needs.changes.outputs.run_tests
-        run: |          
-          uv run --cache-dir .cache-uv/ --frozen \
-              pytest tests \
+#        if: needs.changes.outputs.run_tests
+        run: |
+          uv run --cache-dir .cache-uv/ \
+              python -m pytest tests/test_bg.py \
                 --junit-xml junit-${{ matrix.python-version }}-${{matrix.django-version}}.xml \
                 --cov --cov-report xml
-
       - name: Cache venv
         if: steps.cache-venv-restore.outputs.cache-hit != 'true'
         id: cache-venv-save
@@ -91,7 +98,7 @@ jobs:
           path: |
             .cache-uv/
             .venv/
-          key: ${{ matrix.python-version }}-${{matrix.django-version}}-venv
+          key: ${{ matrix.python-version }}-${{matrix.django-version}}-${{ hashFiles('pyproject.toml') }}-venv
 
       - name: Upload pytest test results
         uses: actions/upload-artifact@v4

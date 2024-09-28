@@ -1,6 +1,8 @@
 import pytest
 from django.urls import reverse
 
+pytestmark = [pytest.mark.admin]
+
 
 @pytest.fixture()
 def job():

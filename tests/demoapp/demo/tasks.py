@@ -1,18 +1,42 @@
-from time import sleep
+import time
 
-from demo.models import Job
+from celery import shared_task
+from concurrency.exceptions import RecordModifiedError
 
-from .celery import app
 
+@shared_task(bind=True)
+def process_job(self, pk, version=None):
+    from .models import Job
 
-@app.task()
-def process_job(pk, version):
-    job = Job.objects.get(pk=pk, version=version)
-    job.name = job.name.upper()
+    job = Job.objects.get(pk=pk)
+
+    if version and job.version != version:
+        raise RecordModifiedError(f"Unexpected version {version}. It should be {job.version}", target=job)
+
+    if job.op == "upper":
+        job.name = job.name.upper()
+    elif job.op == "progress":
+        for i in range(1, job.value):
+            self.update_state(state="PROGRESS", meta={"current": i})
+            time.sleep(0.5)
+    elif job.op == "loop":
+        start = time.time()
+        for i in range(job.value):
+            time.sleep(1)
+        elapsed = time.time() - start
+        return {"loops": job.value, "elapsed": elapsed}
+
+    elif job.op == "sleep":
+        time.sleep(job.value)
+
+    elif job.op == "raise":
+        raise Exception(job.name)
+    else:
+        raise Exception("Unknown {op}")
     job.save()
-    return job.name.upper()
+    return job.name
 
 
-@app.task()
-def stuck_job(pk, version):
-    sleep(1000)
+@shared_task()
+def echo(value):
+    return value

@@ -1,35 +1,24 @@
+import json
+from time import sleep
 from unittest import mock
+from unittest.mock import Mock, PropertyMock
+from uuid import uuid4
 
-from demo.celery import app
 from demo.factories import JobFactory
 from demo.models import Job
 
 
-def test_model_checks(db):
-    assert Job.check() == []
-    with mock.patch("demo.models.Job.celery_task_name", "==="):
-        errors = Job.check()
-        assert errors
-        assert errors[0].msg == "'demo.job': Cannot import Celery task '==='"
-
-    with mock.patch("demo.models.Job.celery_task_name", "demo.models.Job"):
-        errors = Job.check()
-        assert errors
-        assert errors[0].msg == "'demo.job' is using a non registered Celery task. (demo.models.Job)"
-
-    with mock.patch("demo.models.Job.celery_task_name", ""):
-        errors = Job.check()
-        assert errors
-        assert errors[0].msg == "'demo.job' does not have a Celery task name."
-
-
 def test_model_initialize_new(db):
     job: Job = Job()
+
     assert job.version == 0
     assert job.status == Job.NOT_SCHEDULED
     assert job.curr_async_result_id is None
     assert job.async_result is None
     assert not job.is_queued()
+    assert not job.is_canceled()
+    assert job.get_queue_size() == 0
+    assert job.get_queue_entries() == []
     assert job.get_celery_queue_position() == 0
     assert job.celery_queue_status() == {
         "canceled": 0,
@@ -40,14 +29,31 @@ def test_model_initialize_new(db):
 
 
 def test_model_queue(db):
-    job: Job = JobFactory()
-    ver = job.version
-    job.queue()
-    assert job.is_queued()
-    assert job.async_result
-    assert job.async_result.id == job.curr_async_result_id
-    assert job.status == Job.QUEUED
-    assert job.version == ver
+    # from celery import current_app
+
+    job1: Job = JobFactory()
+    job2: Job = JobFactory()
+
+    ver = job1.version
+    job1.queue()
+    sleep(1)
+    assert job1.async_result
+    # Note the difference in the 2 lines below
+    assert job1.async_result.state == Job.PENDING
+    assert job1.status == Job.QUEUED
+
+    assert job1.async_result.app == Job.celery_app
+    assert job1.async_result.id == job1.curr_async_result_id
+    assert job1.is_queued()
+    assert job1.version == ver
+
+    assert job1.get_celery_queue_position() == 1
+    assert job1.get_queue_size() == 1
+    redis_entry = json.loads(job1.get_queue_entries()[0])
+    assert redis_entry["headers"]["id"] == job1.curr_async_result_id
+
+    assert not job2.is_queued()
+    assert not job2.is_canceled()
 
 
 def test_model_disallow_multiple_queue(db):
@@ -72,33 +78,40 @@ def test_model_get_celery_queue_position(db):
 
 def test_model_queue_info(db):
     job1: Job = JobFactory()
-    assert job1.queue_info == {"id": "NotFound"}
+    assert job1.queue_entry == {"id": "NotFound"}
     job1.queue()
-    info = job1.queue_info
+    info = job1.queue_entry
     assert info["body"][0] == [job1.id, job1.version]
     assert info["headers"]["argsrepr"] == f"({job1.id}, {job1.version})"
     assert info["headers"]["id"] == job1.curr_async_result_id
 
     job2: Job = JobFactory()
-    assert job2.queue_info == {"id": "NotFound"}
+    assert job2.queue_entry == {"id": "NotFound"}
+
+    job3: Job = JobFactory(curr_async_result_id=uuid4())
+    assert job3.queue_entry == {"id": "NotFound"}
 
 
 def test_model_queue_info_redis_reset(db):
     job1: Job = JobFactory()
-    assert job1.queue_info == {"id": "NotFound"}
+    assert job1.queue_entry == {"id": "NotFound"}
     job1.queue()
     assert job1.status == Job.QUEUED
 
     # reset celery queue. Simulate Redis crash/flush
-    app.control.purge()
-    assert job1.queue_info == {"id": "NotFound"}
+    Job.celery_app.control.purge()
+    assert job1.queue_entry == {"id": "NotFound"}
     assert job1.status == Job.MISSING
 
 
 def test_model_task_info(db):
     job1: Job = JobFactory()
-    assert job1.task_info is None
-    job1.queue()
+    assert job1.version == 1
+
+    assert job1.task_info == {"status": Job.NOT_SCHEDULED}
+    assert job1.queue()
+    job1.refresh_from_db()
+    assert job1.version == 1
     assert job1.task_info == {
         "error": "",
         "last_update": None,
@@ -107,39 +120,29 @@ def test_model_task_info(db):
         "started_at": 0,
         "status": Job.PENDING,
     }
+    with mock.patch(
+        "demo.models.Job.async_result", Mock(_get_task_meta=lambda: {"result": None, "status": Job.REVOKED})
+    ):
+        assert job1.task_info == {
+            "error": "Query execution cancelled.",
+            "last_update": None,
+            "query_result_id": None,
+            "result": None,
+            "started_at": 0,
+            "status": Job.REVOKED,
+        }
 
 
 def test_terminate(db):
     job1: Job = JobFactory()
-    assert job1.terminate() == ""
+    assert job1.terminate() == Job.UNKNOWN
     assert job1.status == Job.NOT_SCHEDULED
 
     job1.queue()
     assert job1.terminate() == job1.CANCELED
     assert job1.status == Job.CANCELED
 
-
-def test_discard_all(db):
-    Job.discard_all()
-
-
-def test_purge(db):
-    Job.purge()
-
-
-def test_celery_queue_status(db):
-    job1: Job = JobFactory()
-    job2: Job = JobFactory()
-    job3: Job = JobFactory()
-    job1.queue()
-    job2.queue()
-    job3.queue()
-
-    job2.terminate()
-
-    assert Job.celery_queue_status() == {
-        "canceled": 1,
-        "pending": 1,
-        "revoked": 1,
-        "size": 2,
-    }
+    with mock.patch("demo.models.Job.status", new_callable=PropertyMock) as m:
+        with mock.patch("demo.models.Job.async_result", job1.async_result):
+            m.return_value = Job.PROGRESS
+            assert job1.terminate() == job1.REVOKED

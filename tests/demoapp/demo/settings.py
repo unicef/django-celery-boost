@@ -10,9 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
-
-from . import env  # type: ignore[attr-defined]
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_celery_beat",
+    # "django_celery_beat",
     "admin_extra_buttons",
     "celery_model",
     "demo.apps.Config",
@@ -78,8 +77,13 @@ WSGI_APPLICATION = "demo.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        # "ENGINE": "django.db.backends.sqlite3",
+        # "NAME": "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "celery_model",
+        "HOST": "localhost",
+        "PORT": 5432,
+        "USER": "postgres",
     }
 }
 
@@ -127,15 +131,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CELERY_ACCEPT_CONTENT = ["pickle", "json", "application/text", "application/json"]
 # CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": int(CELERY_BROKER_VISIBILITY_VAR)}
-CELERY_BROKER_URL = env("CELERY_BROKER_URL")
-CELERY_BROKER_VISIBILITY_VAR = env("CELERY_VISIBILITY_TIMEOUT")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_BROKER_VISIBILITY_VAR = os.environ.get("CELERY_VISIBILITY_TIMEOUT", 5)
 
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers.DatabaseScheduler"
+# CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers.DatabaseScheduler"
 
 CELERY_TASK_ACKS_LATE = True
-CELERY_TASK_ALWAYS_EAGER = True
-CELERY_TASK_DEFAULT_QUEUE = "queue"
-CELERY_TASK_REVOKED_QUEUE = "revoked"
+CELERY_TASK_ALWAYS_EAGER = False
+CELERY_TASK_DEFAULT_QUEUE = os.environ.get("CELERY_TASK_DEFAULT_QUEUE", "demo_queue")
+CELERY_TASK_REVOKED_QUEUE = os.environ.get("CELERY_TASK_REVOKED_QUEUE", "demo_revoked")
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_TASK_IGNORE_RESULT = False
 CELERY_TASK_PUBLISH_RETRY = True
