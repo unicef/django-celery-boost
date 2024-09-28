@@ -3,11 +3,11 @@ name = "django-celery-model"
 version = "0.1.0"
 description = "Django AnstractModel to work with Celery"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "celery>=5.4.0",
     "django-admin-extra-buttons>=1.5.8",
-    "django-concurrency>=2.5",
+    "django-concurrency>=2.6",
     "django>=4.2.16",
     "djangorestframework>=3.15.2",
     "redis>=5.0.8",
