@@ -69,7 +69,7 @@ def test_tasks_terminate_before_start(transactional_db, celery_app, reset_queue)
 
 def test_celery_queue_status_no_app(transactional_db, reset_queue):
     Job.purge()
-    assert Job.celery_queue_size() == 0
+    assert Job.get_queue_size() == 0
     job1: Job = JobFactory()
     job2: Job = JobFactory()
     job3: Job = JobFactory()
@@ -84,7 +84,7 @@ def test_celery_queue_status_no_app(transactional_db, reset_queue):
 
 
 def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queue):
-    assert Job.celery_queue_size() == 0
+    assert Job.get_queue_size() == 0
     job1: Job = JobFactory()
     job2: Job = JobFactory()
     job3: Job = JobFactory()
@@ -107,7 +107,7 @@ def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queu
 
 
 def test_celery_queue_status_workers(transactional_db, celery_app, celery_worker, reset_queue):
-    assert Job.celery_queue_size() == 0
+    assert Job.get_queue_size() == 0
     job1: Job = JobFactory()
     job2: Job = JobFactory()
     job3: Job = JobFactory()

@@ -81,8 +81,8 @@ def test_model_queue_info(db):
     assert job1.queue_entry == {"id": "NotFound"}
     job1.queue()
     info = job1.queue_entry
-    assert info["body"][0] == [job1.id, job1.version]
-    assert info["headers"]["argsrepr"] == f"({job1.id}, {job1.version})"
+    assert info["body"][0] == [job1.pk, job1.version]
+    assert info["headers"]["argsrepr"] == f"({job1.pk}, {job1.version})"
     assert info["headers"]["id"] == job1.curr_async_result_id
 
     job2: Job = JobFactory()

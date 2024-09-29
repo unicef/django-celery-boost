@@ -67,20 +67,12 @@ class CeleryTaskModel(models.Model):
     celery_task_revoked_queue: str = settings.CELERY_TASK_REVOKED_QUEUE
     _celery_app: Optional[Celery] = None
 
-    # @classproperty
-    # def celery_inspect(cls) -> "celery.app.control.Inspect":
-    #     return cls.celery_app.control.inspect()
-
     @classproperty
     def celery_app(cls) -> "celery.app.base.Celery":
         if not cls._celery_app:
             from celery import current_app as app
             cls._celery_app = app
         return cls._celery_app
-
-    # @classmethod
-    # def celery_stats(cls) -> "celery.app.base.Celery":
-    #     return cls.celery_inspect.stats()
 
     @classmethod
     def check(cls, **kwargs):
@@ -119,10 +111,10 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             return conn.default_channel.client.lrange(cls.celery_task_queue, 0, -1)
 
-    # @classmethod
-    # def get_queue_size(cls) -> "int":
-    #     with cls.celery_app.pool.acquire(block=True) as conn:
-    #         return int(conn.default_channel.client.llen(cls.celery_task_queue))
+    @classmethod
+    def get_queue_size(cls) -> "int":
+        with cls.celery_app.pool.acquire(block=True) as conn:
+            return int(conn.default_channel.client.llen(cls.celery_task_queue))
 
     def get_celery_queue_position(self) -> int:
         with self.celery_app.pool.acquire(block=True) as conn:
@@ -132,11 +124,6 @@ class CeleryTaskModel(models.Model):
             if j["headers"]["id"] == self.curr_async_result_id:
                 return i
         return 0
-
-    @classmethod
-    def celery_queue_size(cls) -> "int":
-        with cls.celery_app.pool.acquire(block=True) as conn:
-            return conn.default_channel.client.llen(cls.celery_task_queue)
 
     @classmethod
     def celery_queue_entries(cls) -> "Generator":
@@ -153,7 +140,7 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             channel = conn.default_channel
             # size = channel.client.llen(cls.celery_task_queue)
-            size = cls.celery_queue_size()
+            size = cls.get_queue_size()
             # tasks = channel.client.lrange(cls.celery_task_queue, 0, size)
             # tasks = list(cls.celery_queue_entries())
             revoked = list(channel.client.smembers(cls.celery_task_revoked_queue))
