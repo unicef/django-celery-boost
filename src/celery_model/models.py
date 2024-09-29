@@ -300,7 +300,7 @@ class CeleryTaskModel(models.Model):
                         if task.get('headers').get('id') == self.curr_async_result_id:
                             conn.default_channel.client.lrem(self.celery_task_queue, 1, task_json)
                             break
-                    except AttributeError:  # pragma: no branch
+                    except AttributeError:  # pragma: no cover
                         pass
                 conn.default_channel.client.delete(f"celery-task-meta-{self.curr_async_result_id}")
             st = self.CANCELED
