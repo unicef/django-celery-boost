@@ -20,7 +20,7 @@ def test_model_initialize_new(db):
     assert job.get_queue_size() == 0
     assert job.get_queue_entries() == []
     assert job.queue_position == 0
-    assert job.celery_queue_status() == {
+    assert job.celery_queue_info() == {
         "canceled": 0,
         "pending": 0,
         "revoked": 0,

@@ -140,7 +140,7 @@ class CeleryTaskModel(models.Model):
             # return conn.default_channel.client.llen(cls.celery_task_queue)
 
     @classmethod
-    def celery_queue_status(cls) -> "dict[str, int]":
+    def celery_queue_info(cls) -> "dict[str, int]":
         """ Returns information about the Queue
 
         Returns:
@@ -176,6 +176,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def async_result(self) -> "AsyncResult|None":
+        """ Returns the AsyncResult object of the current instance"""
         if self.curr_async_result_id:
             return AsyncResult(self.curr_async_result_id)
         else:
@@ -183,9 +184,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def queue_entry(self) -> "dict[str, Any]":
-        # with self.celery_app.pool.acquire(block=True) as conn:
-        #     tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
-
+        """ Returns the queue entry of the current instance"""
         if self.async_result:
             for task in self.celery_queue_entries():
                 j = json.loads(task)
@@ -196,6 +195,11 @@ class CeleryTaskModel(models.Model):
 
     @property
     def task_info(self) -> "dict[str, Any]":
+        """ Returns the task meta information of the current instance
+
+        Returns:
+            Dictionary with task information
+        """
         ret = {"status": self.status}
         if self.async_result:
             info = self.async_result._get_task_meta()

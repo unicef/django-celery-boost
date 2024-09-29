@@ -61,6 +61,7 @@ plugins:
   - mkdocstrings:
       default_handler: python
   - awesome-pages
+  - search
 
 watch:
   - docs/
