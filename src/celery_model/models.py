@@ -159,10 +159,10 @@ class CeleryTaskModel(models.Model):
             pending = size
             canceled = 0
             pending_tasks = [json.loads(task)["headers"]["id"].encode() for task in cls.celery_queue_entries()]
-            for task_id in pending_tasks:
-                if task_id in revoked:
-                    pending -= 1
-                    canceled += 1
+            # for task_id in pending_tasks:
+            #     if task_id in revoked:
+            #         pending -= 1
+            #         canceled += 1
 
             for rem in revoked:
                 if rem not in pending_tasks:
@@ -300,7 +300,7 @@ class CeleryTaskModel(models.Model):
                         if task.get('headers').get('id') == self.curr_async_result_id:
                             conn.default_channel.client.lrem(self.celery_task_queue, 1, task_json)
                             break
-                    except AttributeError:
+                    except AttributeError:  # pragma: no branch
                         pass
                 conn.default_channel.client.delete(f"celery-task-meta-{self.curr_async_result_id}")
             st = self.CANCELED
