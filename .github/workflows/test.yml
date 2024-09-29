@@ -67,7 +67,7 @@ jobs:
     env:
       CELERY_BROKER_URL: redis://localhost:16379/0
       DB_HOST: "localhost"
-      DB_PORT: 15432
+      DB_PORT: 5432
       DB_USER: "postgres"
       DB_PASSWORD: "postgres"
     steps:

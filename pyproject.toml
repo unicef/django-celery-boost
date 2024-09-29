@@ -13,6 +13,8 @@ dependencies = [
 docs = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.5.36",
+    "mkdocs-awesome-pages-plugin>=2.9.3",
+    "mkdocstrings-python",
 ]
 
 [tool.uv]
@@ -24,11 +26,9 @@ dev-dependencies = [
     "flake8>=7.1.1",
     "ipython>=8.18.1",
     "isort>=5.13.2",
-    "mkdocs-material>=9.5.38",
-    "mkdocstrings[python]>=0.26.1",
     "mypy>=1.11.2",
     "pdbpp>=0.10.3",
-    "psycopg2-binary    >=2.9.9",
+    "psycopg2-binary>=2.9.9",
     "pytest-cov>=5.0.0",
     "pytest-django>=4.9.0",
     "pytest-echo>=1.7.3",

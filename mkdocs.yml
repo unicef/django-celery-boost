@@ -10,6 +10,10 @@ site_name: Django Celery Model
 site_url: https://unicef.github.io/unicef/django-celery-model/
 strict: false
 
+
+markdown_extensions:
+  - admonition
+
 theme:
   name: "material"
   color_mode: auto
@@ -22,12 +26,12 @@ theme:
 #    - django
   user_color_mode_toggle: true
   features:
-#    - content.action.edit
-#    - content.code.annotate
+    - content.action.edit
+    - content.code.annotate
     - content.code.copy
-#    - content.tooltips
-#    - header.autohide
-#    - navigation.footer
+    - content.tooltips
+    - header.autohidex
+    - navigation.footer
     - navigation.indexes
     - navigation.instant
     - navigation.instant.prefetch
@@ -54,7 +58,9 @@ theme:
         name: Switch to light mode
 
 plugins:
-  - mkdocstrings
+  - mkdocstrings:
+      default_handler: python
+  - awesome-pages
 
 watch:
   - docs/

@@ -119,10 +119,10 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             return conn.default_channel.client.lrange(cls.celery_task_queue, 0, -1)
 
-    @classmethod
-    def get_queue_size(cls) -> "int":
-        with cls.celery_app.pool.acquire(block=True) as conn:
-            return int(conn.default_channel.client.llen(cls.celery_task_queue))
+    # @classmethod
+    # def get_queue_size(cls) -> "int":
+    #     with cls.celery_app.pool.acquire(block=True) as conn:
+    #         return int(conn.default_channel.client.llen(cls.celery_task_queue))
 
     def get_celery_queue_position(self) -> int:
         with self.celery_app.pool.acquire(block=True) as conn:
@@ -147,6 +147,7 @@ class CeleryTaskModel(models.Model):
 
     @classmethod
     def celery_queue_status(cls) -> "dict[str, int]":
+        """ Returns the status of """
         conn: Connection
         channel: Channel
         with cls.celery_app.pool.acquire(block=True) as conn:
@@ -229,9 +230,11 @@ class CeleryTaskModel(models.Model):
 
     @classproperty
     def task_handler(cls: "type[CeleryTaskModel]") -> "Callable[[Any], Any]":
+        """ Return the task assigned to this model """
         return import_string(cls.celery_task_name)
 
     def is_queued(self) -> bool:
+        """ Check if the job is queued  """
         with self.celery_app.pool.acquire(block=True) as conn:
             tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
         for task in tasks:
@@ -250,6 +253,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def status(self) -> str:
+        """ Returns the task status querying Celery API"""
         try:
             if self.curr_async_result_id:
                 if self.is_canceled():
@@ -268,6 +272,7 @@ class CeleryTaskModel(models.Model):
             return str(e)
 
     def queue(self) -> str | None:
+        """ Queue the record processing"""
         if self.status not in self.SCHEDULED:
             res = self.task_handler.delay(self.pk, self.version)
             with concurrency_disable_increment(self):
@@ -277,6 +282,7 @@ class CeleryTaskModel(models.Model):
         return None
 
     def terminate(self) -> str:
+        """ Revoke the task. Does not need Running workers"""
         st = self.UNKNOWN
         if self.status in ["QUEUED", "PENDING"]:
             with self.celery_app.pool.acquire(block=True) as conn:
@@ -285,10 +291,18 @@ class CeleryTaskModel(models.Model):
                     self.curr_async_result_id,
                     self.curr_async_result_id,
                 )
+                for task_json in self.celery_queue_entries():
+                    task = json.loads(task_json)
+                    try:
+                        if task.get('headers').get('id') == self.curr_async_result_id:
+                            conn.default_channel.client.lrem(self.celery_task_queue, 1, task_json)
+                            break
+                    except AttributeError:
+                        pass
+                conn.default_channel.client.delete(f"celery-task-meta-{self.curr_async_result_id}")
             st = self.CANCELED
         elif self.async_result:
             self.celery_app.control.revoke(self.curr_async_result_id, terminate=True, signal="SIGKILL")
-            # self.async_result.revoke(terminate=True, wait=True)
             st = self.REVOKED
         self.result = st
         self.save(update_fields=["result"])
