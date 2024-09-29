@@ -1,3 +1,4 @@
+import os
 from time import sleep
 
 import pytest
@@ -11,7 +12,9 @@ SLEEP_TIME = 0.2
 
 @pytest.fixture(scope="session")
 def celery_config():
-    return {"broker_url": "redis://localhost:6379", "result_backend": "redis://localhost:6379"}
+    return {"broker_url": os.environ['CELERY_BROKER_URL'],
+            "result_backend": os.environ['CELERY_BROKER_URL']
+            }
 
 
 @pytest.fixture(scope="session")
