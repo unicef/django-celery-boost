@@ -10,10 +10,9 @@ django-celery-model is a small Django Abstract Model that provides some useful m
 Models that represents the "context" of a Celery task.  
 
 
-!!! Note
-    
-    Django-celery-models is part of the UNICEF HOPE project, read more [here](https://unicef.github.io/hope-documentation/).
+Django-celery-models has been developed as part of the UNICEF HOPE project, read more at https://unicef.github.io/hope-documentation/
 
+---
 
 
 ## Features
