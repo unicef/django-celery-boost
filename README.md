@@ -7,5 +7,5 @@
 
 
 
-django-celery-models is a small Django Abstract Model that provides some useful methods to manage 
+django-celery-model is a small Django Abstract Model that provides some useful methods to manage 
 Models that represents the "context" of a Celery task.  
