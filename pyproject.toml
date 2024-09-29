@@ -8,6 +8,7 @@ dependencies = [
     "celery>=5.4.0",
     "django-admin-extra-buttons>=1.5.8",
     "django-concurrency>=2.6",
+    "django==5.1.*",
 ]
 [project.optional-dependencies]
 docs = [
@@ -35,7 +36,6 @@ dev-dependencies = [
     "pytest>=8.3.3",
     "tox>=4.20.0",
     "tox-uv",
-    "django>=5.1.1",
     "psycopg-binary>=3.2.2",
 ]
 

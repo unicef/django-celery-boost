@@ -19,7 +19,7 @@ def test_model_initialize_new(db):
     assert not job.is_canceled()
     assert job.get_queue_size() == 0
     assert job.get_queue_entries() == []
-    assert job.get_celery_queue_position() == 0
+    assert job.queue_position == 0
     assert job.celery_queue_status() == {
         "canceled": 0,
         "pending": 0,
@@ -47,7 +47,7 @@ def test_model_queue(db):
     assert job1.is_queued()
     assert job1.version == ver
 
-    assert job1.get_celery_queue_position() == 1
+    assert job1.queue_position == 1
     assert job1.get_queue_size() == 1
     redis_entry = json.loads(job1.get_queue_entries()[0])
     assert redis_entry["headers"]["id"] == job1.curr_async_result_id
@@ -69,11 +69,11 @@ def test_model_disallow_multiple_queue(db):
 def test_model_get_celery_queue_position(db):
     job1: Job = JobFactory()
     job1.queue()
-    assert job1.get_celery_queue_position() == 1
+    assert job1.queue_position == 1
 
     job2: Job = JobFactory()
     job2.queue()
-    assert job2.get_celery_queue_position() == 2
+    assert job2.queue_position == 2
 
 
 def test_model_queue_info(db):

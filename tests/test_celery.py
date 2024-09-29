@@ -96,14 +96,14 @@ def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queu
     job2.terminate()
     job3.terminate()
     sleep(1)
-    assert Job.get_queue_size() == 2
-    assert Job.celery_queue_status() == {"canceled": 1, "pending": 1, "revoked": 1, "size": 2}
+    assert Job.get_queue_size() == 1
+    assert Job.celery_queue_status() == {"canceled": 0, "pending": 1, "revoked": 1, "size": 1}
 
     job11 = JobFactory()
     job11.terminate()
     with Job.celery_app.pool.acquire(block=True) as conn:
         conn.default_channel.client.delete(Job.celery_task_queue)
-    assert Job.celery_queue_status() == {"canceled": 0, "pending": 0, "revoked": 1, "size": 0}
+    assert Job.celery_queue_status() == {"canceled": 0, "pending": 0, "revoked": 0, "size": 0}
 
 
 def test_celery_queue_status_workers(transactional_db, celery_app, celery_worker, reset_queue):

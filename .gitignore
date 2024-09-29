@@ -7,6 +7,7 @@ build/
 *.patch
 *.egg-info
 *.sqlite*
+uv.lock
 !.git
 !tests/.coveragerc
 !.github

@@ -116,7 +116,14 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             return int(conn.default_channel.client.llen(cls.celery_task_queue))
 
-    def get_celery_queue_position(self) -> int:
+    @property
+    def queue_position(self) -> int:
+        """
+        Returns the position of the current task in the queue.
+
+        Returns:
+            int task position in queue
+        """
         with self.celery_app.pool.acquire(block=True) as conn:
             tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
         for i, task in enumerate(reversed(tasks), 1):
@@ -134,7 +141,12 @@ class CeleryTaskModel(models.Model):
 
     @classmethod
     def celery_queue_status(cls) -> "dict[str, int]":
-        """ Returns the status of """
+        """ Returns information about the Queue
+
+        Returns:
+            Dictionary with size,pendig, canceled, revoked tasks
+        """
+
         conn: Connection
         channel: Channel
         with cls.celery_app.pool.acquire(block=True) as conn:
