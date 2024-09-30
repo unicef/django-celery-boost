@@ -54,7 +54,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: celery_model
+          POSTGRES_DB: django_celery_boost
     defaults:
       run:
         shell: bash

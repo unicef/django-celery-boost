@@ -1,7 +1,7 @@
 from demo.models import Job
 from django.contrib import admin
 
-from celery_model.admin import CeleryTaskModelAdmin
+from django_celery_boost.admin import CeleryTaskModelAdmin
 
 
 @admin.register(Job)

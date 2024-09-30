@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # "django_celery_beat",
     "admin_extra_buttons",
-    "celery_model",
+    "django_celery_boost",
     "demo.apps.Config",
 ]
 
@@ -80,7 +80,7 @@ DATABASES = {
         # "ENGINE": "django.db.backends.sqlite3",
         # "NAME": "db.sqlite3",
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "celery_model",
+        "NAME": "django_celery_boost",
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
         "USER": os.environ.get("DB_USER", "postgres"),

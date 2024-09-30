@@ -1,7 +1,7 @@
 [run]
 branch = True
 source = src
-source_pkgs = celery_model
+source_pkgs = django_celery_boost
 relative_files = True
 # partial_branches =
 omit =

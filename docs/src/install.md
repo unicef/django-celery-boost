@@ -2,7 +2,7 @@
 title: Install
 ---
 
-django-celery-models is a small Django Abstract Model that provides some useful methods to manage 
+django-celery-boost is a small Django Abstract Model that provides some useful methods to manage 
 Models that represents the "context" of a Celery task.  
 
 
@@ -13,7 +13,7 @@ Models that represents the "context" of a Celery task.
 
 ## Install
 
-    pip install django-celery-model
+    pip install django-celery-boost
 
 In your `settings.py`:
     
@@ -22,7 +22,7 @@ In your `settings.py`:
     INSTALLED_APPS = [
         ...
         "admin_extra_buttons",
-        "celery_model",
+        "django_celery_boost",
     ]
     
     CELERY_BROKER_URL=redis:// 

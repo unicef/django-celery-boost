@@ -1,6 +1,6 @@
 from django.db import models
 
-from celery_model.models import CeleryTaskModel
+from django_celery_boost.models import CeleryTaskModel
 
 
 class Job(CeleryTaskModel, models.Model):

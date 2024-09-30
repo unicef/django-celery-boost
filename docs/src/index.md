@@ -2,10 +2,10 @@
 title: Documentation
 ---
 
-django-celery-models is a small Django Abstract Model that provides some useful methods to manage 
+django-celery-boost is a small Django Abstract Model that provides some useful methods to manage 
 Models that represents the "context" of a Celery task.  
 
-django-celery-models is part of the UNICEF HOPE project, read more [here](https://unicef.github.io/hope-documentation/).
+django-celery-boost is part of the UNICEF HOPE project, read more [here](https://unicef.github.io/hope-documentation/).
 
 
 !!! warning
