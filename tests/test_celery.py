@@ -12,9 +12,7 @@ SLEEP_TIME = 0.2
 
 @pytest.fixture(scope="session")
 def celery_config():
-    return {"broker_url": os.environ['CELERY_BROKER_URL'],
-            "result_backend": os.environ['CELERY_BROKER_URL']
-            }
+    return {"broker_url": os.environ["CELERY_BROKER_URL"], "result_backend": os.environ["CELERY_BROKER_URL"]}
 
 
 @pytest.fixture(scope="session")

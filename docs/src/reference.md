@@ -2,7 +2,7 @@
 
 ## CeleryTaskModel
 
-::: celery_model.models.CeleryTaskModel
+::: django_celery_boost.models.CeleryTaskModel
     handler: python
     options:
         annotations_path: brief

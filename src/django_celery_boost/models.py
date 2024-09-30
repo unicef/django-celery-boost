@@ -71,6 +71,7 @@ class CeleryTaskModel(models.Model):
     def celery_app(cls) -> "celery.app.base.Celery":
         if not cls._celery_app:
             from celery import current_app as app
+
             cls._celery_app = app
         return cls._celery_app
 
@@ -81,7 +82,7 @@ class CeleryTaskModel(models.Model):
             errors.append(
                 checks.Error(
                     "'%s' does not have a Celery task name." % cls._meta,
-                    id="celery_model.E001",
+                    id="django_celery_boost.E001",
                 )
             )
         else:
@@ -91,7 +92,7 @@ class CeleryTaskModel(models.Model):
                 errors.append(
                     checks.Error(
                         "'%s': Cannot import Celery task '%s'" % (cls._meta, cls.celery_task_name),
-                        id="celery_model.E002",
+                        id="django_celery_boost.E002",
                     )
                 )
             else:
@@ -100,7 +101,7 @@ class CeleryTaskModel(models.Model):
                     errors.append(
                         checks.Error(
                             "'%s' is using a non registered Celery task. (%s)" % (cls._meta, cls.celery_task_name),
-                            id="celery_model.E003",
+                            id="django_celery_boost.E003",
                         )
                     )
 
@@ -141,7 +142,7 @@ class CeleryTaskModel(models.Model):
 
     @classmethod
     def celery_queue_info(cls) -> "dict[str, int]":
-        """ Returns information about the Queue
+        """Returns information about the Queue
 
         Returns:
             Dictionary with size,pendig, canceled, revoked tasks
@@ -176,7 +177,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def async_result(self) -> "AsyncResult|None":
-        """ Returns the AsyncResult object of the current instance"""
+        """Returns the AsyncResult object of the current instance"""
         if self.curr_async_result_id:
             return AsyncResult(self.curr_async_result_id)
         else:
@@ -184,7 +185,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def queue_entry(self) -> "dict[str, Any]":
-        """ Returns the queue entry of the current instance"""
+        """Returns the queue entry of the current instance"""
         if self.async_result:
             for task in self.celery_queue_entries():
                 j = json.loads(task)
@@ -195,7 +196,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def task_info(self) -> "dict[str, Any]":
-        """ Returns the task meta information of the current instance
+        """Returns the task meta information of the current instance
 
         Returns:
             Dictionary with task information
@@ -233,11 +234,11 @@ class CeleryTaskModel(models.Model):
 
     @classproperty
     def task_handler(cls: "type[CeleryTaskModel]") -> "Callable[[Any], Any]":
-        """ Return the task assigned to this model """
+        """Return the task assigned to this model"""
         return import_string(cls.celery_task_name)
 
     def is_queued(self) -> bool:
-        """ Check if the job is queued  """
+        """Check if the job is queued"""
         with self.celery_app.pool.acquire(block=True) as conn:
             tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
         for task in tasks:
@@ -256,7 +257,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def status(self) -> str:
-        """ Returns the task status querying Celery API"""
+        """Returns the task status querying Celery API"""
         try:
             if self.curr_async_result_id:
                 if self.is_canceled():
@@ -275,7 +276,7 @@ class CeleryTaskModel(models.Model):
             return str(e)
 
     def queue(self) -> str | None:
-        """ Queue the record processing"""
+        """Queue the record processing"""
         if self.status not in self.SCHEDULED:
             res = self.task_handler.delay(self.pk, self.version)
             with concurrency_disable_increment(self):
@@ -285,7 +286,7 @@ class CeleryTaskModel(models.Model):
         return None
 
     def terminate(self) -> str:
-        """ Revoke the task. Does not need Running workers"""
+        """Revoke the task. Does not need Running workers"""
         st = self.UNKNOWN
         if self.status in ["QUEUED", "PENDING"]:
             with self.celery_app.pool.acquire(block=True) as conn:
@@ -297,7 +298,7 @@ class CeleryTaskModel(models.Model):
                 for task_json in self.celery_queue_entries():
                     task = json.loads(task_json)
                     try:
-                        if task.get('headers').get('id') == self.curr_async_result_id:
+                        if task.get("headers").get("id") == self.curr_async_result_id:
                             conn.default_channel.client.lrem(self.celery_task_queue, 1, task_json)
                             break
                     except AttributeError:  # pragma: no cover

@@ -8,7 +8,7 @@ from django.forms import Media
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from celery_model.models import CeleryTaskModel
+from django_celery_boost.models import CeleryTaskModel
 
 
 class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
@@ -49,7 +49,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             [
                 "admin/%s/%s/inspect.html" % (self.opts.app_label, self.opts.model_name),
                 "admin/%s/inspect.html" % self.opts.app_label,
-                "admin/celery_model/inspect.html",
+                "admin/django_celery_boost/inspect.html",
             ],
             ctx,
         )

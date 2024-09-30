@@ -1,7 +1,7 @@
 [project]
-name = "django-celery-model"
+name = "django-celery-boost"
 version = "0.1.0"
-description = "Django AnstractModel to work with Celery"
+description = "Django Anstract Model to work with Celery"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
