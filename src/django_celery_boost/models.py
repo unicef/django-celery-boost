@@ -25,6 +25,13 @@ class CeleryManager:
 
 
 class CeleryTaskModel(models.Model):
+    """
+    Attributes:
+        flight_speed     The maximum speed that such a bird can attain.
+        nesting_grounds  The locale where these birds congregate to reproduce.
+
+    """
+
     class Meta:
         abstract = True
 
@@ -63,8 +70,16 @@ class CeleryTaskModel(models.Model):
     result = models.CharField(max_length=100, default="", blank=True, null=True)
 
     celery_task_name: str = ""
+    "FQN of the task processing this Model's instances"
+
     celery_task_queue: str = settings.CELERY_TASK_DEFAULT_QUEUE
+    """Name of the queue this task connected to. 
+    Only need to be specified if different from `settings.CELERY_TASK_DEFAULT_QUEUE`"""
+
     celery_task_revoked_queue: str = settings.CELERY_TASK_REVOKED_QUEUE
+    """Name of the queue where revoked tasks are stored. 
+    Only need to be specified if different from `settings.CELERY_TASK_REVOKED_QUEUE`"""
+
     _celery_app: Optional[Celery] = None
 
     @classproperty
