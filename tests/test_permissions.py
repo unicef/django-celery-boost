@@ -1,4 +1,3 @@
-from demo.factories import JobFactory
 from django.contrib.auth.models import Permission
 
 
