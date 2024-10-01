@@ -132,6 +132,16 @@ def test_model_task_info(db):
         }
 
 
+def test_revoke(db):
+    job1: Job = JobFactory()
+
+    job1.revoke()
+
+    job1.queue()
+    job1.revoke()
+    assert job1.task_status == Job.QUEUED
+
+
 def test_terminate(db):
     job1: Job = JobFactory()
     assert job1.terminate() == Job.UNKNOWN

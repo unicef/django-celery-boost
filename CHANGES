@@ -2,7 +2,7 @@
 ---
 * Add custom permissions
 * Renamed some fields to avoid clashing
-
+* add revoke() support
 
 0.1
 ---

@@ -36,10 +36,12 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         kwargs["flower_addr"] = getattr(settings, "CELERY_FLOW_ADDRESS", "")
         return super().get_common_context(request, pk, **kwargs)
 
-    @button(permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o))
+    @button(
+        label="Terminate", permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o)
+    )
     def celery_terminate(self, request: HttpRequest, pk: str) -> "HttpResponse":  # type: ignore
         obj: CeleryTaskModel = self.get_object(request, pk)
-        ctx = self.get_common_context(request, pk, title=f"Confirm queue action for {obj}")
+        ctx = self.get_common_context(request, pk, title=f"Confirm termination request for {obj}")
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             obj.terminate()
@@ -104,6 +106,37 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             doit,
             "Do you really want to queue this task?",
             "Queued",
+            extra_context=ctx,
+            description="",
+            template=[
+                "admin/%s/%s/queue.html" % (self.opts.app_label, self.opts.model_name),
+                "admin/%s/queue.html" % self.opts.app_label,
+                "admin/celery_boost/queue.html",
+            ],
+        )
+
+    @button(label="Revoke", permission=lambda r, o, handler: handler.model_admin.has_queue_permission("revoke", r, o))
+    def celery_revoke(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+        obj: Optional[CeleryTaskModel]
+        obj = self.get_object(request, pk)
+
+        ctx = self.get_common_context(request, pk, title=f"Confirm revoking action for {obj}")
+
+        def doit(request: "HttpRequest") -> HttpResponseRedirect:
+            obj.revoke()
+            redirect_url = reverse(
+                "admin:%s_%s_change" % (obj._meta.app_label, obj._meta.model_name),
+                args=(obj.pk,),
+                current_app=self.admin_site.name,
+            )
+            return HttpResponseRedirect(redirect_url)
+
+        return confirm_action(
+            self,
+            request,
+            doit,
+            "Do you really want to queue this task?",
+            "Revoked",
             extra_context=ctx,
             description="",
             template=[

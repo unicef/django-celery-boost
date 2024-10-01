@@ -1,9 +1,8 @@
-from demo.factories import JobFactory, user_grant_permission
-from django.contrib.auth.models import Permission, User
+from demo.factories import JobFactory
+from django.contrib.auth.models import Permission
 
 
 def test_permissions_created(db):
-    job = JobFactory()
     assert Permission.objects.filter(content_type__app_label="demo", codename="queue_job").exists()
     assert Permission.objects.filter(content_type__app_label="demo", codename="test_alternativejob").exists()
 

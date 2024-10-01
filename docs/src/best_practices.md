@@ -4,7 +4,7 @@
 !!! note "General best practices"
 
     - Always return any "readable" value (es. True)
-        
+    - Uses [Persistent revokes](https://docs.celeryq.dev/en/stable/userguide/workers.html#worker-persistent-revokes)        
 
 
 ## Display progress

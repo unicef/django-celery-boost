@@ -133,3 +133,11 @@ def test_celery_queue_status_workers(transactional_db, celery_app, celery_worker
     sleep(1)
     assert Job.get_queue_size() == 0
     assert Job.celery_queue_info() == {"canceled": 0, "pending": 0, "revoked": 0, "size": 0}
+
+
+def test_revoke(transactional_db, celery_app, celery_worker, reset_queue):
+    job1: Job = JobFactory(name="Terminate Before", op="loop", value=5)
+
+    job1.queue()
+    job1.revoke()
+    assert job1.task_status == Job.MISSING

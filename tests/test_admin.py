@@ -1,6 +1,5 @@
 import pytest
 from demo.factories import user_grant_permission
-from django.core.exceptions import PermissionDenied
 from django.urls import reverse
 
 pytestmark = [pytest.mark.admin]
@@ -50,16 +49,6 @@ def test_celery_change(django_app, std_user, job):
 #     assert res.status_code == 302
 
 
-def test_celery_terminate(django_app, std_user, job):
-    url = reverse("admin:demo_job_celery_terminate", args=[job.pk])
-    res = django_app.get(url, user=std_user, expect_errors=True)
-    assert res.status_code == 403
-
-    with user_grant_permission(std_user, ["demo.terminate_job"]):
-        res = django_app.get(url, user=std_user)
-    assert res.status_code == 302
-
-
 def test_celery_inspect(django_app, std_user, job):
     url = reverse("admin:demo_job_celery_inspect", args=[job.pk])
     job.queue()
@@ -101,6 +90,22 @@ def test_celery_terminate(request, django_app, std_user, job):
     assert res.status_code == 403
 
     with user_grant_permission(std_user, ["demo.terminate_job"]):
+        res = django_app.get(url, user=std_user)
+        assert res.status_code == 200
+        res = res.forms[1].submit()
+        assert res.status_code == 302
+
+        res = django_app.get(url, user=std_user)
+        res = res.forms[1].submit()
+        assert res.status_code == 302
+
+
+def test_celery_revoke(request, django_app, std_user, job):
+    url = reverse("admin:demo_job_celery_revoke", args=[job.pk])
+    res = django_app.get(url, user=std_user, expect_errors=True)
+    assert res.status_code == 403
+
+    with user_grant_permission(std_user, ["demo.revoke_job"]):
         res = django_app.get(url, user=std_user)
         assert res.status_code == 200
         res = res.forms[1].submit()

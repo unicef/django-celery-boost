@@ -34,7 +34,7 @@ class CeleryTaskModel(models.Model):
 
     class Meta:
         abstract = True
-        default_permissions = ("add", "change", "delete", "view", "queue", "terminate", "inspect")
+        default_permissions = ("add", "change", "delete", "view", "queue", "terminate", "inspect", "revoke")
 
     STARTED = states.STARTED  # (task has been started)
     SUCCESS = states.SUCCESS  # (task executed successfully)
@@ -286,7 +286,11 @@ class CeleryTaskModel(models.Model):
             return self.curr_async_result_id
         return None
 
-    def terminate(self) -> str:
+    def revoke(self, wait=False, timeout=None) -> None:
+        if self.async_result:
+            self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
+
+    def terminate(self, wait=False, timeout=None) -> str:
         """Revoke the task. Does not need Running workers"""
         if self.task_status in ["QUEUED", "PENDING"]:
             with self.celery_app.pool.acquire(block=True) as conn:
@@ -308,7 +312,7 @@ class CeleryTaskModel(models.Model):
             self.curr_async_result_id = None
             st = self.CANCELED
         elif self.async_result:
-            self.celery_app.control.revoke(self.curr_async_result_id, terminate=True, signal="SIGKILL")
+            self.async_result.revoke(terminate=True, signal="SIGKILL", wait=wait, timeout=timeout)
             st = self.REVOKED
         else:
             self.curr_async_result_id = None
