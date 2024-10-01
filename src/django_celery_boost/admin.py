@@ -1,14 +1,14 @@
-from typing import Optional, Sequence, Any
+from typing import Any, Optional, Sequence
 
 from admin_extra_buttons.decorators import button
 from admin_extra_buttons.mixins import ExtraButtonsMixin, confirm_action
+from django.conf import settings
 from django.contrib import admin
 from django.db.models import Model
-from django.http.response import HttpResponseRedirect
 from django.http import HttpRequest, HttpResponse
+from django.http.response import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
-from django.conf import settings
 
 from django_celery_boost.models import CeleryTaskModel
 
