@@ -1,8 +1,13 @@
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+from django.contrib.auth.hashers import make_password
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
 
 here = Path(__file__).parent
 DEMOAPP_PATH = here / "demoapp"
@@ -26,6 +31,7 @@ def pytest_configure(config):
     django.setup()
     from django.conf import settings
 
+    settings.AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
     settings.CELERY_TASK_ALWAYS_EAGER = False
     settings.CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL")
     settings.DEMOAPP_PATH = DEMOAPP_PATH
@@ -44,3 +50,16 @@ def reset_queue():
     with Job.celery_app.pool.acquire(block=True) as conn:
         conn.default_channel.client.delete(CELERY_TASK_DEFAULT_QUEUE)
         conn.default_channel.client.delete(CELERY_TASK_REVOKED_QUEUE)
+
+
+@pytest.fixture()
+def std_user(db) -> "User":
+    from demo.factories import UserFactory
+
+    return UserFactory(
+        username="admin@example.com",
+        is_staff=True,
+        is_active=True,
+        is_superuser=False,
+        password=make_password("password"),
+    )

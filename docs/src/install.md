@@ -15,6 +15,8 @@ Models that represents the "context" of a Celery task.
 
     pip install django-celery-boost
 
+## Setup
+
 In your `settings.py`:
     
     from <app>.config import env
@@ -31,8 +33,9 @@ In your `settings.py`:
     CELERY_TASK_DEFAULT_QUEUE = "my_tasks_queue"
     CELERY_TASK_REVOKED_QUEUE = "my_revoked_queue"
 
-## Setup your application
+    CELERY_BOOST_FLOWER = "<your flower address if available>"
 
+## Use in your code
 
 In your `tasks.py`
 
@@ -54,6 +57,19 @@ In your `models.py`
         # optional in csse 
         celery_task_queue = ...  
         celery_task_revoked_queue = ...
+
+
+
+!!! warning 
+
+    Due to how Meta inheritance works in Django, you must use `class Meta(CeleryTaskModel.Meta)`
+    in case tou need to customize your concrete class's Meta. Es:
+
+        
+        class Meta(CeleryTaskModel.Meta):
+            verbose_name = "Job"
+
+
 
 To "run" your task:
 

@@ -34,6 +34,7 @@ class CeleryTaskModel(models.Model):
 
     class Meta:
         abstract = True
+        default_permissions = ("add", "change", "delete", "view", "queue", "terminate", "inspect")
 
     STARTED = states.STARTED  # (task has been started)
     SUCCESS = states.SUCCESS  # (task executed successfully)
@@ -52,32 +53,36 @@ class CeleryTaskModel(models.Model):
     MISSING = "MISSING"  # Task seems scheduled (it has a ResultID, but is not present in Celery)
     UNKNOWN = "UNKNOWN"  # Task is UNKNOWN
 
-    SCHEDULED = frozenset({states.PENDING, states.RECEIVED, states.STARTED, states.RETRY, QUEUED})
+    ACTIVE_STATUSES = frozenset({states.PENDING, states.RECEIVED, states.STARTED, states.RETRY, QUEUED})
 
     version = AutoIncVersionField()
 
-    last_run = models.DateTimeField(null=True, blank=True)
     curr_async_result_id = models.CharField(
         max_length=36,
         blank=True,
         null=True,
+        editable=False,
         help_text="Current (active) AsyncResult is",
     )
     last_async_result_id = models.CharField(
-        max_length=36, blank=True, null=True, help_text="Latest executed AsyncResult is"
+        max_length=36,
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Latest executed AsyncResult is",
     )
-    history = models.JSONField(default=dict, blank=True, null=False)
-    result = models.CharField(max_length=100, default="", blank=True, null=True)
+    celery_history = models.JSONField(default=dict, blank=True, null=False, editable=False)
+    celery_result = models.CharField(max_length=100, default="", blank=True, null=True, editable=False)
 
     celery_task_name: str = ""
     "FQN of the task processing this Model's instances"
 
     celery_task_queue: str = settings.CELERY_TASK_DEFAULT_QUEUE
-    """Name of the queue this task connected to. 
+    """Name of the queue this task connected to.
     Only need to be specified if different from `settings.CELERY_TASK_DEFAULT_QUEUE`"""
 
     celery_task_revoked_queue: str = settings.CELERY_TASK_REVOKED_QUEUE
-    """Name of the queue where revoked tasks are stored. 
+    """Name of the queue where revoked tasks are stored.
     Only need to be specified if different from `settings.CELERY_TASK_REVOKED_QUEUE`"""
 
     _celery_app: Optional[Celery] = None
@@ -153,7 +158,6 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             for entry in conn.default_channel.client.lrange(cls.celery_task_queue, 0, -1):
                 yield entry
-            # return conn.default_channel.client.llen(cls.celery_task_queue)
 
     @classmethod
     def celery_queue_info(cls) -> "dict[str, int]":
@@ -167,22 +171,11 @@ class CeleryTaskModel(models.Model):
         channel: Channel
         with cls.celery_app.pool.acquire(block=True) as conn:
             channel = conn.default_channel
-            # size = channel.client.llen(cls.celery_task_queue)
             size = cls.get_queue_size()
-            # tasks = channel.client.lrange(cls.celery_task_queue, 0, size)
-            # tasks = list(cls.celery_queue_entries())
             revoked = list(channel.client.smembers(cls.celery_task_revoked_queue))
             pending = size
             canceled = 0
-            pending_tasks = [json.loads(task)["headers"]["id"].encode() for task in cls.celery_queue_entries()]
-            # for task_id in pending_tasks:
-            #     if task_id in revoked:
-            #         pending -= 1
-            #         canceled += 1
 
-            for rem in revoked:
-                if rem not in pending_tasks:
-                    channel.client.srem(cls.celery_task_revoked_queue, rem)
             return {
                 "size": size,
                 "pending": pending,
@@ -216,7 +209,7 @@ class CeleryTaskModel(models.Model):
         Returns:
             Dictionary with task information
         """
-        ret = {"status": self.status}
+        ret = {"status": self.task_status}
         if self.async_result:
             info = self.async_result._get_task_meta()
             result, task_status = info["result"], info["status"]
@@ -262,22 +255,11 @@ class CeleryTaskModel(models.Model):
                 return True
         return False
 
-    def is_canceled(self) -> bool:
-        if self.curr_async_result_id:
-            with self.celery_app.pool.acquire(block=True) as conn:
-                return (
-                    conn.default_channel.client.sismember(self.celery_task_revoked_queue, self.curr_async_result_id) > 0
-                )
-        return False
-
     @property
-    def status(self) -> str:
+    def task_status(self) -> str:
         """Returns the task status querying Celery API"""
         try:
             if self.curr_async_result_id:
-                if self.is_canceled():
-                    return self.CANCELED
-
                 result = self.async_result.state
                 if result == self.PENDING:
                     if self.is_queued():
@@ -290,10 +272,14 @@ class CeleryTaskModel(models.Model):
         except Exception as e:
             return str(e)
 
-    def queue(self) -> str | None:
-        """Queue the record processing"""
-        if self.status not in self.SCHEDULED:
-            res = self.task_handler.delay(self.pk, self.version)
+    def queue(self, use_version: bool = True) -> str | None:
+        """Queue the record processing.
+
+        Parameters:
+            use_version: if True the task fails if the record is changed after it has been queued.
+        """
+        if self.task_status not in self.ACTIVE_STATUSES:
+            res = self.task_handler.delay(self.pk, self.version if use_version else None)
             with concurrency_disable_increment(self):
                 self.curr_async_result_id = res.id
                 self.save(update_fields=["curr_async_result_id"])
@@ -302,29 +288,34 @@ class CeleryTaskModel(models.Model):
 
     def terminate(self) -> str:
         """Revoke the task. Does not need Running workers"""
-        st = self.UNKNOWN
-        if self.status in ["QUEUED", "PENDING"]:
+        if self.task_status in ["QUEUED", "PENDING"]:
             with self.celery_app.pool.acquire(block=True) as conn:
                 conn.default_channel.client.sadd(
                     self.celery_task_revoked_queue,
                     self.curr_async_result_id,
                     self.curr_async_result_id,
                 )
+                # removes the task from the queue
                 for task_json in self.celery_queue_entries():
                     task = json.loads(task_json)
                     try:
-                        if task.get("headers").get("id") == self.curr_async_result_id:
+                        if task.get("headers").get("id") == self.curr_async_result_id:  # pragma: no branch
                             conn.default_channel.client.lrem(self.celery_task_queue, 1, task_json)
                             break
                     except AttributeError:  # pragma: no cover
                         pass
                 conn.default_channel.client.delete(f"celery-task-meta-{self.curr_async_result_id}")
+            self.curr_async_result_id = None
             st = self.CANCELED
         elif self.async_result:
             self.celery_app.control.revoke(self.curr_async_result_id, terminate=True, signal="SIGKILL")
             st = self.REVOKED
-        self.result = st
-        self.save(update_fields=["result"])
+        else:
+            self.curr_async_result_id = None
+            st = self.UNKNOWN
+
+        self.celery_result = st
+        self.save(update_fields=["celery_result", "curr_async_result_id"])
         return st
 
     @classmethod

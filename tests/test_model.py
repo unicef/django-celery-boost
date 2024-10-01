@@ -4,6 +4,7 @@ from unittest import mock
 from unittest.mock import Mock, PropertyMock
 from uuid import uuid4
 
+from celery.result import AsyncResult
 from demo.factories import JobFactory
 from demo.models import Job
 
@@ -12,11 +13,10 @@ def test_model_initialize_new(db):
     job: Job = Job()
 
     assert job.version == 0
-    assert job.status == Job.NOT_SCHEDULED
+    assert job.task_status == Job.NOT_SCHEDULED
     assert job.curr_async_result_id is None
     assert job.async_result is None
     assert not job.is_queued()
-    assert not job.is_canceled()
     assert job.get_queue_size() == 0
     assert job.get_queue_entries() == []
     assert job.queue_position == 0
@@ -40,7 +40,7 @@ def test_model_queue(db):
     assert job1.async_result
     # Note the difference in the 2 lines below
     assert job1.async_result.state == Job.PENDING
-    assert job1.status == Job.QUEUED
+    assert job1.task_status == Job.QUEUED
 
     assert job1.async_result.app == Job.celery_app
     assert job1.async_result.id == job1.curr_async_result_id
@@ -53,7 +53,6 @@ def test_model_queue(db):
     assert redis_entry["headers"]["id"] == job1.curr_async_result_id
 
     assert not job2.is_queued()
-    assert not job2.is_canceled()
 
 
 def test_model_disallow_multiple_queue(db):
@@ -96,12 +95,12 @@ def test_model_queue_info_redis_reset(db):
     job1: Job = JobFactory()
     assert job1.queue_entry == {"id": "NotFound"}
     job1.queue()
-    assert job1.status == Job.QUEUED
+    assert job1.task_status == Job.QUEUED
 
     # reset celery queue. Simulate Redis crash/flush
     Job.celery_app.control.purge()
     assert job1.queue_entry == {"id": "NotFound"}
-    assert job1.status == Job.MISSING
+    assert job1.task_status == Job.MISSING
 
 
 def test_model_task_info(db):
@@ -136,13 +135,22 @@ def test_model_task_info(db):
 def test_terminate(db):
     job1: Job = JobFactory()
     assert job1.terminate() == Job.UNKNOWN
-    assert job1.status == Job.NOT_SCHEDULED
+    assert job1.task_status == Job.NOT_SCHEDULED
 
     job1.queue()
-    assert job1.terminate() == job1.CANCELED
-    assert job1.status == Job.CANCELED
+    assert job1.terminate() == Job.CANCELED
 
-    with mock.patch("demo.models.Job.status", new_callable=PropertyMock) as m:
-        with mock.patch("demo.models.Job.async_result", job1.async_result):
+    assert job1.task_status == Job.NOT_SCHEDULED
+    assert not job1.is_queued()
+
+    with mock.patch("demo.models.Job.task_status", new_callable=PropertyMock) as m:
+        with mock.patch("demo.models.Job.async_result", AsyncResult(id="1")):
             m.return_value = Job.PROGRESS
             assert job1.terminate() == job1.REVOKED
+            assert not job1.is_queued()
+
+    job1.queue()
+    with mock.patch("demo.models.Job.task_status", new_callable=PropertyMock) as m:
+        m.return_value = Job.QUEUED
+        with mock.patch("demo.models.Job.celery_queue_entries", return_value=[]):
+            assert job1.terminate() == job1.CANCELED

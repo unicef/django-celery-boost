@@ -1,17 +1,21 @@
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Any
 
-from admin_extra_buttons.decorators import button, view
-from admin_extra_buttons.mixins import ExtraButtonsMixin
-from django.contrib import admin, messages
+from admin_extra_buttons.decorators import button
+from admin_extra_buttons.mixins import ExtraButtonsMixin, confirm_action
+from django.contrib import admin
 from django.db.models import Model
-from django.forms import Media
+from django.http.response import HttpResponseRedirect
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.urls import reverse
+from django.conf import settings
 
 from django_celery_boost.models import CeleryTaskModel
 
 
 class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
+    change_form_template = "admin/celery_boost/change_form.html"
+
     def get_readonly_fields(self, request: HttpRequest, obj: "Optional[Model]" = None) -> Sequence[str]:
         ret = list(super().get_readonly_fields(request, obj))
         ret.append("curr_async_result_id")
@@ -28,54 +32,83 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 obj.curr_async_result_id = None
                 obj.save()
 
-    @view()
-    def celery_discard_all(self, request: HttpRequest) -> "HttpResponse":  # type: ignore
-        self.model.discard_all()
+    def get_common_context(self, request: HttpRequest, pk: str = None, **kwargs: Any) -> dict[str, Any]:
+        kwargs["flower_addr"] = getattr(settings, "CELERY_FLOW_ADDRESS", "")
+        return super().get_common_context(request, pk, **kwargs)
 
-    @view()
-    def celery_purge(self, request: HttpRequest) -> "HttpResponse":  # type: ignore
-        self.model.purge()
-
-    @view()
+    @button(permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o))
     def celery_terminate(self, request: HttpRequest, pk: str) -> "HttpResponse":  # type: ignore
         obj: CeleryTaskModel = self.get_object(request, pk)
-        obj.terminate()
+        ctx = self.get_common_context(request, pk, title=f"Confirm queue action for {obj}")
 
-    @view()
-    def celery_inspect(self, request: HttpRequest, pk: int) -> HttpResponse:
-        ctx = self.get_common_context(request, pk=pk)
+        def doit(request: "HttpRequest") -> HttpResponseRedirect:
+            obj.terminate()
+            redirect_url = reverse(
+                "admin:%s_%s_change" % (obj._meta.app_label, obj._meta.model_name),
+                args=(obj.pk,),
+                current_app=self.admin_site.name,
+            )
+            return HttpResponseRedirect(redirect_url)
+
+        return confirm_action(
+            self,
+            request,
+            doit,
+            "Do you really want to queue this task?",
+            "Queued",
+            extra_context=ctx,
+            description="",
+            template=[
+                "admin/%s/%s/queue.html" % (self.opts.app_label, self.opts.model_name),
+                "admin/%s/queue.html" % self.opts.app_label,
+                "admin/celery_boost/queue.html",
+            ],
+        )
+
+    @button(permission=lambda r, o, handler: handler.model_admin.has_queue_permission("inspect", r, o))
+    def celery_inspect(self, request: HttpRequest, pk: str) -> HttpResponse:
+        ctx = self.get_common_context(request, pk, title="Inspect Task")
         return render(
             request,
             [
                 "admin/%s/%s/inspect.html" % (self.opts.app_label, self.opts.model_name),
                 "admin/%s/inspect.html" % self.opts.app_label,
-                "admin/django_celery_boost/inspect.html",
+                "admin/celery_boost/inspect.html",
             ],
             ctx,
         )
 
-    # @view()
-    # def celery_result(self, request: HttpRequest, pk: int) -> HttpResponse:
-    #     self.get_common_context(request, pk=pk)
-    #     result = TaskResult.objects.filter(task_id=self.object.curr_async_result_id).first()
-    #     if result:
-    #         url = reverse("admin:django_celery_results_taskresult_change", args=[result.pk])
-    #         return redirect(url)
-    #     else:
-    #         self.message_user(request, "Result not found", messages.ERROR)
+    def has_queue_permission(self, perm, request: HttpRequest, o: Optional[CeleryTaskModel]) -> bool:
+        perm = "%s.%s_%s" % (self.model._meta.app_label, perm, self.model._meta.model_name)
+        return request.user.has_perm(perm)
 
-    @view()
-    def celery_queue(self, request: "HttpRequest", pk: int) -> "HttpResponse":  # type: ignore
+    @button(label="Queue", permission=lambda r, o, handler: handler.model_admin.has_queue_permission("queue", r, o))
+    def celery_queue(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         obj: Optional[CeleryTaskModel]
-        try:
-            obj = self.get_object(request, str(pk))
-            if obj.queue():
-                self.message_user(request, f"Task scheduled: {obj.curr_async_result_id}")
-        except Exception as e:
-            self.message_user(request, f"{e.__class__.__name__}: {e}", messages.ERROR)
+        obj = self.get_object(request, pk)
 
-    @property
-    def media(self) -> Media:
-        response = super().media
-        response._js_lists.append(["admin/celery.js"])
-        return response
+        ctx = self.get_common_context(request, pk, title=f"Confirm queue action for {obj}")
+
+        def doit(request: "HttpRequest") -> HttpResponseRedirect:
+            obj.queue()
+            redirect_url = reverse(
+                "admin:%s_%s_change" % (obj._meta.app_label, obj._meta.model_name),
+                args=(obj.pk,),
+                current_app=self.admin_site.name,
+            )
+            return HttpResponseRedirect(redirect_url)
+
+        return confirm_action(
+            self,
+            request,
+            doit,
+            "Do you really want to queue this task?",
+            "Queued",
+            extra_context=ctx,
+            description="",
+            template=[
+                "admin/%s/%s/queue.html" % (self.opts.app_label, self.opts.model_name),
+                "admin/%s/queue.html" % self.opts.app_label,
+                "admin/celery_boost/queue.html",
+            ],
+        )

@@ -36,20 +36,19 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # "django_celery_beat",
     "admin_extra_buttons",
     "django_celery_boost",
     "demo.apps.Config",
 ]
 
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
+    # "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    # "django.middleware.common.CommonMiddleware",
+    # "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "demo.urls"
@@ -77,16 +76,11 @@ WSGI_APPLICATION = "demo.wsgi.application"
 
 DATABASES = {
     "default": {
-        # "ENGINE": "django.db.backends.sqlite3",
-        # "NAME": "db.sqlite3",
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "django_celery_boost",
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": "db.sqlite3",
     }
 }
+AUTHENTICATION_BACKENDS = ("demo.backends.AnyUserAuthBackend",)
 
 SESSION_COOKIE_SECURE = False
 SECURE_SSL_REDIRECT = False
@@ -129,7 +123,6 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
 CELERY_ACCEPT_CONTENT = ["pickle", "json", "application/text", "application/json"]
 # CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": int(CELERY_BROKER_VISIBILITY_VAR)}
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -148,7 +141,6 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_TASK_TIME_LIMIT = None
 CELERY_TASK_TRACK_STARTED = True
 
-
 CELERY_WORKER_DISABLE_RATE_LIMITS = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
@@ -163,3 +155,5 @@ CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_BROKER_CONNECTION_RETRY = False
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = False
+
+CELERY_FLOW_ADDRESS = "http://127.0.0.1:5555"

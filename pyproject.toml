@@ -1,15 +1,15 @@
 [project]
 name = "django-celery-boost"
 version = "0.1.0"
-description = "Django Anstract Model to work with Celery"
+description = "Django Abstract Model to work with Celery"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "celery>=5.4.0",
     "django-admin-extra-buttons>=1.5.8",
-    "django-concurrency>=2.6",
-    "django==5.1.*",
+    "django-concurrency>=2.6"
 ]
+
 [project.optional-dependencies]
 docs = [
     "mkdocs>=1.6.1",
@@ -37,6 +37,7 @@ dev-dependencies = [
     "tox>=4.20.0",
     "tox-uv",
     "psycopg-binary>=3.2.2",
+    "flower>=2.0.1",
 ]
 
 
