@@ -4,7 +4,8 @@
 [![Lint](https://github.com/unicef/django-celery-boost/actions/workflows/lint.yml/badge.svg)](https://github.com/unicef/django-celery-boost/actions/workflows/lint.yml)
 [![Documentation](https://github.com/unicef/django-celery-boost/actions/workflows/docs.yml/badge.svg)](https://unicef.github.io/django-celery-boost/)
 [![codecov](https://codecov.io/github/unicef/django-celery-boost/graph/badge.svg?token=L7HA5PJ45B)](https://codecov.io/github/unicef/django-celery-boost)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/django-celery-boost)](https://pypi.org/project/django-celery-boost/)
+[![PyPI - Python Version](https://img.shields.io/pypi/v/django-celery-boost)](https://pypi.org/project/django-celery-boost/)
+
 
 
 django-celery-boost is a small Django Abstract Model that provides some useful methods to manage 
