@@ -14,7 +14,10 @@ from django_celery_boost.models import CeleryTaskModel
 
 
 class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
-    change_form_template = "admin/celery_boost/change_form.html"
+    change_form_template = None
+    terminate_template = None
+    inspect_template = None
+    queue_template = None
 
     def get_readonly_fields(self, request: HttpRequest, obj: "Optional[Model]" = None) -> Sequence[str]:
         ret = list(super().get_readonly_fields(request, obj))
@@ -56,14 +59,15 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             self,
             request,
             doit,
-            "Do you really want to queue this task?",
-            "Queued",
+            "Do you really want to terminate this task?",
+            "Terminated",
             extra_context=ctx,
             description="",
             template=[
-                "admin/%s/%s/queue.html" % (self.opts.app_label, self.opts.model_name),
-                "admin/%s/queue.html" % self.opts.app_label,
-                "admin/celery_boost/queue.html",
+                self.terminate_template,
+                "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label),
+                "%s/celery_boost/terminate.html" % self.admin_site.name,
             ],
         )
 
@@ -72,10 +76,10 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         ctx = self.get_common_context(request, pk, title="Inspect Task")
         return render(
             request,
-            [
-                "admin/%s/%s/inspect.html" % (self.opts.app_label, self.opts.model_name),
-                "admin/%s/inspect.html" % self.opts.app_label,
-                "admin/celery_boost/inspect.html",
+            self.inspect_template or [
+                "%s/%s/%s/inspect.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/inspect.html" % (self.admin_site.name, self.opts.app_label),
+                "%s/celery_boost/inspect.html" % self.admin_site.name,
             ],
             ctx,
         )
@@ -94,7 +98,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             obj.queue()
             redirect_url = reverse(
-                "admin:%s_%s_change" % (obj._meta.app_label, obj._meta.model_name),
+                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
@@ -108,10 +112,11 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             "Queued",
             extra_context=ctx,
             description="",
-            template=[
-                "admin/%s/%s/queue.html" % (self.opts.app_label, self.opts.model_name),
-                "admin/%s/queue.html" % self.opts.app_label,
-                "admin/celery_boost/queue.html",
+            template=self.queue_template or [
+
+                "%s/%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label),
+                "%s/celery_boost/queue.html" % self.admin_site.name,
             ],
         )
 
@@ -125,7 +130,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             obj.revoke()
             redirect_url = reverse(
-                "admin:%s_%s_change" % (obj._meta.app_label, obj._meta.model_name),
+                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
@@ -140,8 +145,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             extra_context=ctx,
             description="",
             template=[
-                "admin/%s/%s/queue.html" % (self.opts.app_label, self.opts.model_name),
-                "admin/%s/queue.html" % self.opts.app_label,
-                "admin/celery_boost/queue.html",
+                "%s/%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label),
+                "%s/celery_boost/queue.html" % self.admin_site.name,
             ],
         )
