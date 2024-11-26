@@ -63,8 +63,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             "Terminated",
             extra_context=ctx,
             description="",
-            template=[
-                self.terminate_template,
+            template=self.terminate_template or [
                 "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/terminate.html" % self.admin_site.name,
