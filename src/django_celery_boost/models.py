@@ -237,9 +237,10 @@ class CeleryTaskModel(models.Model):
                 # "id": self.async_result.id,
                 "started_at": started_at,
                 "completed_at": date_done,
+                "last_update": date_done,
                 "status": task_status,
                 "error": error,
-                "result": query_result_id,
+                "query_result_id": query_result_id,
             }
         return ret
 

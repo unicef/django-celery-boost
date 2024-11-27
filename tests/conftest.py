@@ -35,6 +35,7 @@ def pytest_configure(config):
     settings.CELERY_TASK_ALWAYS_EAGER = False
     settings.CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL")
     settings.DEMOAPP_PATH = DEMOAPP_PATH
+    settings.MESSAGE_STORAGE = "demo.messages.PlainCookieStorage"
 
     from celery.fixups.django import DjangoWorkerFixup
 

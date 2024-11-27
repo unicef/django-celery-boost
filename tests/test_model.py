@@ -107,16 +107,17 @@ def test_model_task_info(db):
     job1: Job = JobFactory()
     assert job1.version == 1
 
-    assert job1.task_info == {"status": Job.NOT_SCHEDULED}
+    assert job1.task_info == {"status": Job.NOT_SCHEDULED, "completed_at": ""}
     assert job1.queue()
     job1.refresh_from_db()
     assert job1.version == 1
     assert job1.task_info == {
         "error": "",
+        "completed_at": None,
         "last_update": None,
         "query_result_id": None,
         "result": None,
-        "started_at": 0,
+        "started_at": "-",
         "status": Job.PENDING,
     }
     with mock.patch(
@@ -127,7 +128,8 @@ def test_model_task_info(db):
             "last_update": None,
             "query_result_id": None,
             "result": None,
-            "started_at": 0,
+            "started_at": "-",
+            "completed_at": None,
             "status": Job.REVOKED,
         }
 
