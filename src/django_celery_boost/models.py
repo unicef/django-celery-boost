@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Generator, Optional
 
 from celery import states
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     import celery.app.control
     from kombu.connection import Connection
     from kombu.transport.redis import Channel
+
+logger = logging.getLogger(__name__)
 
 
 class CeleryManager:
@@ -251,12 +254,15 @@ class CeleryTaskModel(models.Model):
 
     def is_queued(self) -> bool:
         """Check if the job is queued"""
-        with self.celery_app.pool.acquire(block=True) as conn:
-            tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
-        for task in tasks:
-            j = json.loads(task)
-            if j["headers"]["id"] == self.curr_async_result_id:
-                return True
+        try:
+            with self.celery_app.pool.acquire(block=True) as conn:
+                tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
+            for task in tasks:
+                j = json.loads(task)
+                if j["headers"]["id"] == self.curr_async_result_id:
+                    return True
+        except Exception as e:
+            logger.exception(e)
         return False
 
     def is_terminated(self) -> bool:
@@ -296,7 +302,9 @@ class CeleryTaskModel(models.Model):
 
     def revoke(self, wait=False, timeout=None) -> None:
         if self.async_result:
-            self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
+            return self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
+        else:
+            return None
 
     def terminate(self, wait=False, timeout=None) -> str:
         """Revoke the task. Does not need Running workers"""

@@ -156,7 +156,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             obj.terminate()
             redirect_url = reverse(
-                "admin:%s_%s_change" % (obj._meta.app_label, obj._meta.model_name),
+                "%a:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
