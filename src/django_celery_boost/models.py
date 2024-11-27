@@ -54,6 +54,7 @@ class CeleryTaskModel(models.Model):
     UNKNOWN = "UNKNOWN"  # Task is UNKNOWN
 
     ACTIVE_STATUSES = frozenset({states.PENDING, states.RECEIVED, states.STARTED, states.RETRY, QUEUED})
+    TERMINATED_STATUSES = frozenset({states.REJECTED, states.REVOKED, states.FAILURE})
 
     version = AutoIncVersionField()
 
@@ -145,6 +146,8 @@ class CeleryTaskModel(models.Model):
         Returns:
             int task position in queue
         """
+        if self.is_terminated():
+            return 0
         with self.celery_app.pool.acquire(block=True) as conn:
             tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
         for i, task in enumerate(reversed(tasks), 1):
@@ -209,15 +212,15 @@ class CeleryTaskModel(models.Model):
         Returns:
             Dictionary with task information
         """
-        ret = {"status": self.task_status}
+        ret = {"status": self.task_status, "completed_at": ""}
         if self.async_result:
             info = self.async_result._get_task_meta()
             result, task_status = info["result"], info["status"]
             if task_status == self.SUCCESS:
                 started_at = info.get("start_time", 0)
             else:
-                started_at = 0
-            last_update = info.get("date_done", None)
+                started_at = "-"
+            date_done = info.get("date_done", None)
             if isinstance(result, Exception):
                 error = str(result)
             elif task_status == self.REVOKED:
@@ -232,11 +235,11 @@ class CeleryTaskModel(models.Model):
             return {
                 **info,
                 # "id": self.async_result.id,
-                "last_update": last_update,
                 "started_at": started_at,
+                "completed_at": date_done,
                 "status": task_status,
                 "error": error,
-                "query_result_id": query_result_id,
+                "result": query_result_id,
             }
         return ret
 
@@ -254,6 +257,10 @@ class CeleryTaskModel(models.Model):
             if j["headers"]["id"] == self.curr_async_result_id:
                 return True
         return False
+
+    def is_terminated(self) -> bool:
+        """Check if the job is queued"""
+        return self.task_status and self.task_status in self.TERMINATED_STATUSES
 
     @property
     def task_status(self) -> str:

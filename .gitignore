@@ -18,3 +18,4 @@ uv.lock
 !.pre-commit-config.yaml
 !bandit.yaml
 coverage.xml
+Makefile
