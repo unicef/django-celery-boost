@@ -1,3 +1,11 @@
+0.5
+---
+* rename `celery_result` as `local_status`
+* add `datetime_queued`, `datetime_created`, `repeatable`, `owner`, `group_key`
+* add signals
+* add property verbose_status
+
+
 0.4.1
 ---
 * fixes deps version

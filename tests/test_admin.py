@@ -98,13 +98,11 @@ def test_celery_terminate(request, django_app, std_user, job):
         res = django_app.get(url, user=std_user).follow()
         msgs = res.context["messages"]
         assert [m.message for m in msgs] == ["Task not queued."]
-
-        with mock.patch.object(Job, "is_queued") as m:
-            m.return_value = True
+        with mock.patch.object(Job, "is_queued", lambda s: True):
             res = django_app.get(url, user=std_user)
             res = res.forms[1].submit().follow()
             msgs = res.context["messages"]
-            assert [m.message for m in msgs] == ["Terminated"]
+            assert [m.message for m in msgs] == ["UNKNOWN"]
 
 
 def test_celery_revoke(request, django_app, std_user, job):

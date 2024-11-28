@@ -11,9 +11,12 @@ from concurrency.fields import AutoIncVersionField
 from django.conf import settings
 from django.core import checks
 from django.db import models
+from django.utils import timezone
 from django.utils.functional import classproperty
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext as _
+
+from django_celery_boost.signals import task_queued, task_revoked, task_terminated
 
 if TYPE_CHECKING:
     import celery.app.control
@@ -28,12 +31,6 @@ class CeleryManager:
 
 
 class CeleryTaskModel(models.Model):
-    """
-    Attributes:
-        flight_speed     The maximum speed that such a bird can attain.
-        nesting_grounds  The locale where these birds congregate to reproduce.
-
-    """
 
     class Meta:
         abstract = True
@@ -75,9 +72,26 @@ class CeleryTaskModel(models.Model):
         editable=False,
         help_text="Latest executed AsyncResult is",
     )
-    celery_history = models.JSONField(default=dict, blank=True, null=False, editable=False)
-    celery_result = models.CharField(max_length=100, default="", blank=True, null=True, editable=False)
+    datetime_created = models.DateTimeField(auto_now_add=True, help_text="Creation date and time")
+    datetime_queued = models.DateTimeField("Queued At", blank=True, null=True, help_text="Queueing date and time")
+    repeatable = models.BooleanField(default=False, blank=True, help_text="Indicate if the job can be repeated as-is")
 
+    celery_history = models.JSONField(default=dict, blank=True, null=False, editable=False)
+    local_status = models.CharField(max_length=100, default="", blank=True, null=True, editable=False)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="%(app_label)s_%(class)s_jobs",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    group_key = models.CharField(
+        max_length=255,
+        blank=True,
+        editable=False,
+        null=True,
+        help_text="Tasks with the same group key will not run in parallel",
+    )
     celery_task_name: str = ""
     "FQN of the task processing this Model's instances"
 
@@ -269,6 +283,17 @@ class CeleryTaskModel(models.Model):
         """Check if the job is queued"""
         return self.task_status and self.task_status in self.TERMINATED_STATUSES
 
+    def log_task_action(self, action, user):
+        self.celery_history[str(timezone.now())] = f"{action} by {user}"
+        self.save(update_fields=["celery_history"])
+
+    @property
+    def verbose_status(self) -> str:
+        status = self.task_status
+        if self.local_status:
+            return f"{status} ({self.local_status})"
+        return status
+
     @property
     def task_status(self) -> str:
         """Returns the task status querying Celery API"""
@@ -296,15 +321,16 @@ class CeleryTaskModel(models.Model):
             res = self.task_handler.delay(self.pk, self.version if use_version else None)
             with concurrency_disable_increment(self):
                 self.curr_async_result_id = res.id
-                self.save(update_fields=["curr_async_result_id"])
+                self.datetime_queued = timezone.now()
+                self.save(update_fields=["curr_async_result_id", "datetime_queued"])
+                task_queued.send(sender=self.__class__, task=self)
             return self.curr_async_result_id
         return None
 
     def revoke(self, wait=False, timeout=None) -> None:
         if self.async_result:
-            return self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
-        else:
-            return None
+            self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
+        task_revoked.send(sender=self.__class__, task=self)
 
     def terminate(self, wait=False, timeout=None) -> str:
         """Revoke the task. Does not need Running workers"""
@@ -334,8 +360,9 @@ class CeleryTaskModel(models.Model):
             self.curr_async_result_id = None
             st = self.UNKNOWN
 
-        self.celery_result = st
-        self.save(update_fields=["celery_result", "curr_async_result_id"])
+        self.local_status = st
+        self.save(update_fields=["local_status", "curr_async_result_id"])
+        task_terminated.send(sender=self.__class__, task=self)
         return st
 
     @classmethod

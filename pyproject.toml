@@ -1,6 +1,6 @@
 [project]
 name = "django-celery-boost"
-version = "0.4.1"
+version = "0.5.0"
 description = "Django Abstract Model to work with Celery"
 readme = "README.md"
 requires-python = ">=3.10"

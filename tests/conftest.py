@@ -33,6 +33,7 @@ def pytest_configure(config):
 
     settings.AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
     settings.CELERY_TASK_ALWAYS_EAGER = False
+    settings.CELERY_TASK_STORE_EAGER_RESULT = True
     settings.CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL")
     settings.DEMOAPP_PATH = DEMOAPP_PATH
     settings.MESSAGE_STORAGE = "demo.messages.PlainCookieStorage"

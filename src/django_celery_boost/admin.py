@@ -44,7 +44,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         ctx = self.get_common_context(request, pk, title="Inspect Task")
         return render(
             request,
-            self.inspect_template or [
+            self.inspect_template
+            or [
                 "%s/%s/%s/inspect.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/inspect.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/inspect.html" % self.admin_site.name,
@@ -85,10 +86,11 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 current_app=self.admin_site.name,
             )
             return HttpResponseRedirect(redirect_url)
+
         if obj.is_queued():
             self.message_user(request, "Task has already been queued.", messages.WARNING)
             return
-        if obj.is_terminated():
+        if obj.is_terminated() and not obj.repeatable:
             self.message_user(request, "Task is already terminated.", messages.WARNING)
             return
 
@@ -100,7 +102,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             "Queued",
             extra_context=ctx,
             description="",
-            template=self.queue_template or [
+            template=self.queue_template
+            or [
                 "%s/%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/queue.html" % self.admin_site.name,
@@ -154,12 +157,14 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         ctx = self.get_common_context(request, pk, title=f"Confirm termination request for {obj}")
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
-            obj.terminate()
+            result = obj.terminate()
             redirect_url = reverse(
-                "%a:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
+                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
+            self.message_user(request, str(result), messages.SUCCESS)
+
             return HttpResponseRedirect(redirect_url)
 
         return confirm_action(
@@ -167,10 +172,11 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             request,
             doit,
             "Do you really want to terminate this task?",
-            "Terminated",
+            None,
             extra_context=ctx,
             description="",
-            template=self.terminate_template or [
+            template=self.terminate_template
+            or [
                 "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/terminate.html" % self.admin_site.name,

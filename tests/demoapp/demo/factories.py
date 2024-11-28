@@ -29,6 +29,7 @@ class GroupFactory(DjangoModelFactory):
     class Meta:
         model = Group
         django_get_or_create = ("name",)
+        skip_postgeneration_save = True
 
     @factory.post_generation  # type: ignore[misc]
     def permissions(self, create: bool, extracted: list[str], **kwargs: Any) -> None:
@@ -40,6 +41,11 @@ class GroupFactory(DjangoModelFactory):
             for perm_name in extracted:
                 app, perm = perm_name.split(".")
                 self.permissions.add(Permission.objects.get(content_type__app_label=app, codename=perm))
+
+    @classmethod
+    def _after_postgeneration(cls, instance, create, results=None):
+        if create and results and not cls._meta.skip_postgeneration_save:
+            instance.save()
 
 
 class user_grant_permission:
