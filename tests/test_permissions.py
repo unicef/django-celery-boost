@@ -12,3 +12,6 @@ def test_permissions_created(db):
     assert Permission.objects.filter(
         content_type__app_label="demo", codename="queue_alternativejob"
     ).exists()
+    assert Permission.objects.filter(
+        content_type__app_label="demo", codename="test_multiplejob"
+    ).exists()

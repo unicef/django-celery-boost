@@ -3,6 +3,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Generator, Optional
 
+import sentry_sdk
 from celery import states
 from celery.app.base import Celery
 from celery.result import AsyncResult
@@ -134,7 +135,7 @@ class CeleryTaskModel(models.Model):
         return cls._celery_app
 
     @property
-    def celery_task_name(self):
+    def celery_task_name(self):  # pragma: no cover
         return self.default_celery_task_name
 
     @classmethod
@@ -419,3 +420,53 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             conn.default_channel.client.delete(cls.celery_task_queue)
             conn.default_channel.client.delete(cls.celery_task_revoked_queue)
+
+
+class AsyncJobModel(CeleryTaskModel):
+    class JobType(models.TextChoices):
+        STANDARD_TASK = "STANDARD_TASK", "Standard Task"
+        JOB_TASK = "JOB_TASK", "Job Task"
+
+    type = models.CharField(max_length=50, choices=JobType.choices)
+    config = models.JSONField(default=dict, blank=True)
+    action = models.CharField(max_length=500, blank=True, null=True)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    sentry_id = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        abstract = True
+        permissions = (("debug_job", "Can debug background jobs"),)
+
+    def __str__(self):
+        return self.description or f"Background Job #{self.pk}"
+
+    @property
+    def queue_position(self) -> int:
+        try:
+            return super().queue_position
+        except Exception:
+            return 0
+
+    @property
+    def started(self) -> str:
+        try:
+            return self.task_info["started_at"]
+        except Exception:
+            return "="
+
+    def execute(self):
+        sid = None
+        try:
+            func = import_string(self.action)
+            match self.type:
+                case AsyncJobModel.JobType.STANDARD_TASK:
+                    return func(**self.config)
+                case AsyncJobModel.JobType.JOB_TASK:
+                    return func(self)
+        except Exception as e:
+            sid = sentry_sdk.capture_exception(e)
+            raise e
+        finally:
+            if sid:
+                self.sentry_id = sid
+                self.save(update_fields=["sentry_id"])

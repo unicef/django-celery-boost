@@ -2,6 +2,7 @@ import time
 
 from celery import shared_task
 from concurrency.exceptions import RecordModifiedError
+from django.core.cache import cache
 
 
 @shared_task(bind=True)
@@ -40,5 +41,11 @@ def process_job(self, pk, version=None):
 
 
 @shared_task()
-def echo(value):
+def echo(value="echo"):
+    return value
+
+
+@shared_task()
+def cache_store(key, value):
+    cache.set(key, value)
     return value

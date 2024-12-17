@@ -1,6 +1,6 @@
 from django.db import models
 
-from django_celery_boost.models import CeleryTaskModel
+from django_celery_boost.models import AsyncJobModel, CeleryTaskModel
 
 
 class Job(CeleryTaskModel, models.Model):
@@ -29,5 +29,12 @@ class Job(CeleryTaskModel, models.Model):
 class AlternativeJob(CeleryTaskModel, models.Model):
     class Meta(CeleryTaskModel.Meta):
         permissions = (("test_alternativejob", "Can test AlternativeJob"),)
+
+    celery_task_name = "demo.tasks.process_job"
+
+
+class MultipleJob(AsyncJobModel):
+    class Meta(AsyncJobModel.Meta):
+        permissions = (("test_multiplejob", "Can test MultipleJob"),)
 
     celery_task_name = "demo.tasks.process_job"

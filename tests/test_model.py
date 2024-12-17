@@ -26,6 +26,7 @@ def test_model_initialize_new(db):
         "revoked": 0,
         "size": 0,
     }
+    assert job.celery_task_name == "demo.tasks.process_job"
 
 
 def test_model_queue(db):
@@ -67,6 +68,8 @@ def test_model_disallow_multiple_queue(db):
 
 def test_model_get_celery_queue_position(db):
     job1: Job = JobFactory()
+    assert job1.queue_position == 0
+
     job1.queue()
     assert job1.queue_position == 1
 
@@ -161,6 +164,7 @@ def test_terminate(db):
             m.return_value = Job.PROGRESS
             assert job1.terminate() == job1.REVOKED
             assert not job1.is_queued()
+            assert job1.queue_position == 0
 
     job1.queue()
     with mock.patch("demo.models.Job.task_status", new_callable=PropertyMock) as m:

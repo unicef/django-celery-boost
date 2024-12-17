@@ -9,6 +9,7 @@ dependencies = [
     "django-admin-extra-buttons>=1.5.8",
     "django-concurrency>=2.6",
     "django>=4",
+    "sentry-sdk",
 ]
 
 [project.optional-dependencies]

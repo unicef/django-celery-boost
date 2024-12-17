@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import factory
-from demo.models import Job
+from demo.models import Job, MultipleJob
 from django.contrib.auth.models import Group, Permission, User
 from factory.django import DjangoModelFactory
 from factory.faker import Faker
@@ -16,6 +16,14 @@ class JobFactory(DjangoModelFactory):
 
     class Meta:
         model = Job
+
+
+class AsyncJobModelFactory(DjangoModelFactory):
+    curr_async_result_id = None
+    last_async_result_id = None
+
+    class Meta:
+        model = MultipleJob
 
 
 class UserFactory(DjangoModelFactory):
