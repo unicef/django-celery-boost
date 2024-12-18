@@ -113,6 +113,10 @@ class CeleryTaskModel(models.Model):
             cls._celery_app = app
         return cls._celery_app
 
+    @property
+    def celery_task_name(self):
+      return self.default_celery_task_name
+
     @classmethod
     def check(cls, **kwargs):
         errors = super().check(**kwargs)
