@@ -92,7 +92,7 @@ class CeleryTaskModel(models.Model):
         null=True,
         help_text="Tasks with the same group key will not run in parallel",
     )
-    celery_task_name: str = ""
+    default_celery_task_name: str = ""
     "FQN of the task processing this Model's instances"
 
     celery_task_queue: str = settings.CELERY_TASK_DEFAULT_QUEUE
@@ -118,7 +118,7 @@ class CeleryTaskModel(models.Model):
         errors = super().check(**kwargs)
         if not cls.celery_task_name:
             errors.append(
-                checks.Error(
+                checks.Warning(
                     "'%s' does not have a Celery task name." % cls._meta,
                     id="django_celery_boost.E001",
                 )
