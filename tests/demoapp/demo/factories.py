@@ -40,7 +40,9 @@ class GroupFactory(DjangoModelFactory):
         if extracted:
             for perm_name in extracted:
                 app, perm = perm_name.split(".")
-                self.permissions.add(Permission.objects.get(content_type__app_label=app, codename=perm))
+                self.permissions.add(
+                    Permission.objects.get(content_type__app_label=app, codename=perm)
+                )
 
     @classmethod
     def _after_postgeneration(cls, instance, create, results=None):

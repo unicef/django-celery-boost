@@ -89,10 +89,16 @@ class PlainCookieStorage(BaseStorage):
         """
         if encoded_data:
             response.set_cookie(
-                self.cookie_name, encoded_data, domain=settings.SESSION_COOKIE_DOMAIN, secure=None, httponly=None
+                self.cookie_name,
+                encoded_data,
+                domain=settings.SESSION_COOKIE_DOMAIN,
+                secure=None,
+                httponly=None,
             )
         else:
-            response.delete_cookie(self.cookie_name, domain=settings.SESSION_COOKIE_DOMAIN)
+            response.delete_cookie(
+                self.cookie_name, domain=settings.SESSION_COOKIE_DOMAIN
+            )
 
     def _store(self, messages, response, remove_oldest=True, *args, **kwargs) -> Any:
         """
@@ -118,7 +124,9 @@ class PlainCookieStorage(BaseStorage):
                     unstored_messages.append(messages.pop(0))
                 else:
                     unstored_messages.insert(0, messages.pop())
-                encoded_data = self._encode(messages + [self.not_finished], encode_empty=unstored_messages)
+                encoded_data = self._encode(
+                    messages + [self.not_finished], encode_empty=unstored_messages
+                )
         self._update_cookie(encoded_data, response)
         return unstored_messages
 

@@ -12,7 +12,10 @@ SLEEP_TIME = 0.2
 
 @pytest.fixture(scope="session")
 def celery_config():
-    return {"broker_url": os.environ["CELERY_BROKER_URL"], "result_backend": os.environ["CELERY_BROKER_URL"]}
+    return {
+        "broker_url": os.environ["CELERY_BROKER_URL"],
+        "result_backend": os.environ["CELERY_BROKER_URL"],
+    }
 
 
 @pytest.fixture(scope="session")
@@ -86,14 +89,24 @@ def test_celery_queue_status_no_app(transactional_db, reset_queue):
     job1: Job = JobFactory()
     job2: Job = JobFactory()
     job3: Job = JobFactory()
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 0, "revoked": 0, "size": 0}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 0,
+        "revoked": 0,
+        "size": 0,
+    }
 
     job1.queue()
     job2.queue()
     job3.queue()
     sleep(1)
     assert Job.get_queue_size() == 3
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 3, "revoked": 0, "size": 3}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 3,
+        "revoked": 0,
+        "size": 3,
+    }
 
 
 def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queue):
@@ -101,7 +114,12 @@ def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queu
     job1: Job = JobFactory()
     job2: Job = JobFactory()
     job3: Job = JobFactory()
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 0, "revoked": 0, "size": 0}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 0,
+        "revoked": 0,
+        "size": 0,
+    }
 
     job1.queue()
     job2.queue()
@@ -111,28 +129,50 @@ def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queu
 
     sleep(1)
     assert Job.get_queue_size() == 1
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 1, "revoked": 1, "size": 1}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 1,
+        "revoked": 1,
+        "size": 1,
+    }
 
     job11 = JobFactory()
     job11.terminate()
     with Job.celery_app.pool.acquire(block=True) as conn:
         conn.default_channel.client.delete(Job.celery_task_queue)
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 0, "revoked": 1, "size": 0}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 0,
+        "revoked": 1,
+        "size": 0,
+    }
 
 
-def test_celery_queue_status_workers(transactional_db, celery_app, celery_worker, reset_queue):
+def test_celery_queue_status_workers(
+    transactional_db, celery_app, celery_worker, reset_queue
+):
     assert Job.get_queue_size() == 0
     job1: Job = JobFactory()
     job2: Job = JobFactory()
     job3: Job = JobFactory()
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 0, "revoked": 0, "size": 0}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 0,
+        "revoked": 0,
+        "size": 0,
+    }
 
     job1.queue()
     job2.queue()
     job3.queue()
     sleep(1)
     assert Job.get_queue_size() == 0
-    assert Job.celery_queue_info() == {"canceled": 0, "pending": 0, "revoked": 0, "size": 0}
+    assert Job.celery_queue_info() == {
+        "canceled": 0,
+        "pending": 0,
+        "revoked": 0,
+        "size": 0,
+    }
 
 
 def test_revoke(transactional_db, celery_app, celery_worker, reset_queue):

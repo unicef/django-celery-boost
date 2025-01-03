@@ -11,7 +11,9 @@ def process_job(self, pk, version=None):
     job = Job.objects.get(pk=pk)
 
     if version and job.version != version:
-        raise RecordModifiedError(f"Unexpected version {version}. It should be {job.version}", target=job)
+        raise RecordModifiedError(
+            f"Unexpected version {version}. It should be {job.version}", target=job
+        )
 
     if job.op == "upper":
         job.name = job.name.upper()

@@ -121,7 +121,8 @@ def test_model_task_info(db):
         "status": Job.PENDING,
     }
     with mock.patch(
-        "demo.models.Job.async_result", Mock(_get_task_meta=lambda: {"result": None, "status": Job.REVOKED})
+        "demo.models.Job.async_result",
+        Mock(_get_task_meta=lambda: {"result": None, "status": Job.REVOKED}),
     ):
         assert job1.task_info == {
             "error": "Query execution cancelled.",

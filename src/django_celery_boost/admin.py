@@ -19,7 +19,9 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     inspect_template = None
     queue_template = None
 
-    def get_readonly_fields(self, request: HttpRequest, obj: "Optional[Model]" = None) -> Sequence[str]:
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: "Optional[Model]" = None
+    ) -> Sequence[str]:
         ret = list(super().get_readonly_fields(request, obj))
         ret.append("curr_async_result_id")
         return ret
@@ -35,38 +37,64 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 obj.curr_async_result_id = None
                 obj.save()
 
-    def get_common_context(self, request: HttpRequest, pk: str = None, **kwargs: Any) -> dict[str, Any]:
+    def get_common_context(
+        self, request: HttpRequest, pk: str = None, **kwargs: Any
+    ) -> dict[str, Any]:
         kwargs["flower_addr"] = getattr(settings, "CELERY_FLOW_ADDRESS", "")
         return super().get_common_context(request, pk, **kwargs)
 
-    @button(permission=lambda r, o, handler: handler.model_admin.has_queue_permission("inspect", r, o))
+    @button(
+        permission=lambda r, o, handler: handler.model_admin.has_queue_permission(
+            "inspect", r, o
+        )
+    )
     def celery_inspect(self, request: HttpRequest, pk: str) -> HttpResponse:
         ctx = self.get_common_context(request, pk, title="Inspect Task")
         return render(
             request,
             self.inspect_template
             or [
-                "%s/%s/%s/inspect.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/%s/inspect.html"
+                % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/inspect.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/inspect.html" % self.admin_site.name,
             ],
             ctx,
         )
 
-    def has_queue_permission(self, perm, request: HttpRequest, o: Optional[CeleryTaskModel]) -> bool:
-        perm = "%s.%s_%s" % (self.model._meta.app_label, perm, self.model._meta.model_name)
+    def has_queue_permission(
+        self, perm, request: HttpRequest, o: Optional[CeleryTaskModel]
+    ) -> bool:
+        perm = "%s.%s_%s" % (
+            self.model._meta.app_label,
+            perm,
+            self.model._meta.model_name,
+        )
         return request.user.has_perm(perm)
 
-    @button(label="Queue", permission=lambda r, o, handler: handler.model_admin.has_queue_permission("queue", r, o))
+    @button(
+        label="Queue",
+        permission=lambda r, o, handler: handler.model_admin.has_queue_permission(
+            "queue", r, o
+        ),
+    )
     def celery_queue(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         return self._celery_queue(request, pk)
 
-    @button(label="Revoke", permission=lambda r, o, handler: handler.model_admin.has_queue_permission("revoke", r, o))
+    @button(
+        label="Revoke",
+        permission=lambda r, o, handler: handler.model_admin.has_queue_permission(
+            "revoke", r, o
+        ),
+    )
     def celery_revoke(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         return self._celery_revoke(request, pk)
 
     @button(
-        label="Terminate", permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o)
+        label="Terminate",
+        permission=lambda r, o, handler: handler.model_admin.has_queue_permission(
+            "terminate", r, o
+        ),
     )
     def celery_terminate(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         return self._celery_terminate(request, pk)
@@ -75,20 +103,25 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         obj: Optional[CeleryTaskModel]
         obj = self.get_object(request, pk)
 
-        ctx = self.get_common_context(request, pk, title=f"Confirm queue action for {obj}")
+        ctx = self.get_common_context(
+            request, pk, title=f"Confirm queue action for {obj}"
+        )
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             if obj.queue() is None:
                 self.message_user(request, "Task already queued", level=messages.INFO)
             redirect_url = reverse(
-                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
+                "%s:%s_%s_change"
+                % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
             return HttpResponseRedirect(redirect_url)
 
         if obj.is_queued():
-            self.message_user(request, "Task has already been queued.", messages.WARNING)
+            self.message_user(
+                request, "Task has already been queued.", messages.WARNING
+            )
             return
         if obj.is_terminated() and not obj.repeatable:
             self.message_user(request, "Task is already terminated.", messages.WARNING)
@@ -104,7 +137,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             description="",
             template=self.queue_template
             or [
-                "%s/%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/%s/queue.html"
+                % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/queue.html" % self.admin_site.name,
             ],
@@ -120,12 +154,15 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         if obj.is_terminated():
             self.message_user(request, "Task is already terminated.", messages.WARNING)
             return
-        ctx = self.get_common_context(request, pk, title=f"Confirm revoking action for {obj}")
+        ctx = self.get_common_context(
+            request, pk, title=f"Confirm revoking action for {obj}"
+        )
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             obj.revoke()
             redirect_url = reverse(
-                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
+                "%s:%s_%s_change"
+                % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
@@ -140,7 +177,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             extra_context=ctx,
             description="",
             template=[
-                "%s/%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/%s/queue.html"
+                % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/queue.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/queue.html" % self.admin_site.name,
             ],
@@ -154,12 +192,15 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         if obj.is_terminated():
             self.message_user(request, "Task is already terminated.", messages.WARNING)
             return
-        ctx = self.get_common_context(request, pk, title=f"Confirm termination request for {obj}")
+        ctx = self.get_common_context(
+            request, pk, title=f"Confirm termination request for {obj}"
+        )
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
             result = obj.terminate()
             redirect_url = reverse(
-                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
+                "%s:%s_%s_change"
+                % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
                 current_app=self.admin_site.name,
             )
@@ -177,7 +218,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             description="",
             template=self.terminate_template
             or [
-                "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/%s/terminate.html"
+                % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
                 "%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label),
                 "%s/celery_boost/terminate.html" % self.admin_site.name,
             ],
