@@ -12,9 +12,7 @@ def process_job(self, pk, version=None):
     job = Job.objects.get(pk=pk)
 
     if version and job.version != version:
-        raise RecordModifiedError(
-            f"Unexpected version {version}. It should be {job.version}", target=job
-        )
+        raise RecordModifiedError(f"Unexpected version {version}. It should be {job.version}", target=job)
 
     if job.op == "upper":
         job.name = job.name.upper()
@@ -49,3 +47,8 @@ def echo(value="echo"):
 def cache_store(key, value):
     cache.set(key, value)
     return value
+
+
+@shared_task()
+def raise_task(param):
+    raise Exception("Boom!")

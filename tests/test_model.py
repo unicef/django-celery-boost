@@ -5,8 +5,10 @@ from unittest.mock import Mock, PropertyMock
 from uuid import uuid4
 
 from celery.result import AsyncResult
-from demo.factories import JobFactory
+from demo.factories import AsyncJobModelFactory, JobFactory
 from demo.models import Job
+
+from django_celery_boost.models import CeleryTaskModel
 
 
 def test_model_initialize_new(db):
@@ -171,3 +173,12 @@ def test_terminate(db):
         m.return_value = Job.QUEUED
         with mock.patch("demo.models.Job.celery_queue_entries", return_value=[]):
             assert job1.terminate() == job1.CANCELED
+
+
+def test_str(db):
+    description = "this is me"
+    async_job = AsyncJobModelFactory(description=description)
+    assert str(async_job) == description
+
+    async_job3 = AsyncJobModelFactory()
+    assert str(async_job3) == f"Background Job #{async_job3.pk}"

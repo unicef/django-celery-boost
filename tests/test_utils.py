@@ -14,10 +14,7 @@ def test_model_checks(db):
     with mock.patch("demo.models.Job.celery_task_name", "demo.models.Job"):
         errors = Job.check()
         assert errors
-        assert (
-            errors[0].msg
-            == "'demo.job' is using a non registered Celery task. (demo.models.Job)"
-        )
+        assert errors[0].msg == "'demo.job' is using a non registered Celery task. (demo.models.Job)"
 
     with mock.patch("demo.models.Job.celery_task_name", ""):
         errors = Job.check()

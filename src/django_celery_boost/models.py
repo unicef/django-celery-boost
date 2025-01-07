@@ -62,12 +62,11 @@ class CeleryTaskModel(models.Model):
     MISSING = "MISSING"  # Task seems scheduled (it has a ResultID, but is not present in Celery)
     UNKNOWN = "UNKNOWN"  # Task is UNKNOWN
 
-    ACTIVE_STATUSES = frozenset(
-        {states.PENDING, states.RECEIVED, states.STARTED, states.RETRY, QUEUED}
-    )
+    ACTIVE_STATUSES = frozenset({states.PENDING, states.RECEIVED, states.STARTED, states.RETRY, QUEUED})
     TERMINATED_STATUSES = frozenset({states.REJECTED, states.REVOKED, states.FAILURE})
 
     version = AutoIncVersionField()
+    description = models.CharField(max_length=255, blank=True, null=True)
 
     curr_async_result_id = models.CharField(
         max_length=36,
@@ -83,22 +82,12 @@ class CeleryTaskModel(models.Model):
         editable=False,
         help_text="Latest executed AsyncResult is",
     )
-    datetime_created = models.DateTimeField(
-        auto_now_add=True, help_text="Creation date and time"
-    )
-    datetime_queued = models.DateTimeField(
-        "Queued At", blank=True, null=True, help_text="Queueing date and time"
-    )
-    repeatable = models.BooleanField(
-        default=False, blank=True, help_text="Indicate if the job can be repeated as-is"
-    )
+    datetime_created = models.DateTimeField(auto_now_add=True, help_text="Creation date and time")
+    datetime_queued = models.DateTimeField("Queued At", blank=True, null=True, help_text="Queueing date and time")
+    repeatable = models.BooleanField(default=False, blank=True, help_text="Indicate if the job can be repeated as-is")
 
-    celery_history = models.JSONField(
-        default=dict, blank=True, null=False, editable=False
-    )
-    local_status = models.CharField(
-        max_length=100, default="", blank=True, null=True, editable=False
-    )
+    celery_history = models.JSONField(default=dict, blank=True, null=False, editable=False)
+    local_status = models.CharField(max_length=100, default="", blank=True, null=True, editable=False)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="%(app_label)s_%(class)s_jobs",
@@ -125,6 +114,9 @@ class CeleryTaskModel(models.Model):
     Only need to be specified if different from `settings.CELERY_TASK_REVOKED_QUEUE`"""
 
     _celery_app: Optional[Celery] = None
+
+    def __str__(self):
+        return self.description or f"Background Job #{self.pk}"
 
     @classproperty
     def celery_app(cls) -> "celery.app.base.Celery":
@@ -154,8 +146,7 @@ class CeleryTaskModel(models.Model):
             except ImportError:
                 errors.append(
                     checks.Error(
-                        "'%s': Cannot import Celery task '%s'"
-                        % (cls._meta, cls.celery_task_name),
+                        "'%s': Cannot import Celery task '%s'" % (cls._meta, cls.celery_task_name),
                         id="django_celery_boost.E002",
                     )
                 )
@@ -164,8 +155,7 @@ class CeleryTaskModel(models.Model):
                 if cls.celery_task_name not in cls.celery_app.tasks.keys():
                     errors.append(
                         checks.Error(
-                            "'%s' is using a non registered Celery task. (%s)"
-                            % (cls._meta, cls.celery_task_name),
+                            "'%s' is using a non registered Celery task. (%s)" % (cls._meta, cls.celery_task_name),
                             id="django_celery_boost.E003",
                         )
                     )
@@ -203,9 +193,7 @@ class CeleryTaskModel(models.Model):
     @classmethod
     def celery_queue_entries(cls) -> "Generator":
         with cls.celery_app.pool.acquire(block=True) as conn:
-            for entry in conn.default_channel.client.lrange(
-                cls.celery_task_queue, 0, -1
-            ):
+            for entry in conn.default_channel.client.lrange(cls.celery_task_queue, 0, -1):
                 yield entry
 
     @classmethod
@@ -290,6 +278,13 @@ class CeleryTaskModel(models.Model):
             }
         return ret
 
+    @property
+    def started(self) -> str:
+        try:
+            return self.task_info["started_at"]
+        except KeyError:
+            return "="
+
     @classproperty
     def task_handler(cls: "type[CeleryTaskModel]") -> "Callable[[Any], Any]":
         """Return the task assigned to this model"""
@@ -299,9 +294,7 @@ class CeleryTaskModel(models.Model):
         """Check if the job is queued"""
         try:
             with self.celery_app.pool.acquire(block=True) as conn:
-                tasks = conn.default_channel.client.lrange(
-                    self.celery_task_queue, 0, -1
-                )
+                tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
             for task in tasks:
                 j = json.loads(task)
                 if j["headers"]["id"] == self.curr_async_result_id:
@@ -349,9 +342,7 @@ class CeleryTaskModel(models.Model):
             use_version: if True the task fails if the record is changed after it has been queued.
         """
         if self.task_status not in self.ACTIVE_STATUSES:
-            res = self.task_handler.delay(
-                self.pk, self.version if use_version else None
-            )
+            res = self.task_handler.delay(self.pk, self.version if use_version else None)
             with concurrency_disable_increment(self):
                 self.curr_async_result_id = res.id
                 self.datetime_queued = timezone.now()
@@ -362,9 +353,7 @@ class CeleryTaskModel(models.Model):
 
     def revoke(self, wait=False, timeout=None) -> None:
         if self.async_result:
-            self.async_result.revoke(
-                terminate=False, signal="SIGTERM", wait=wait, timeout=timeout
-            )
+            self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
         task_revoked.send(sender=self.__class__, task=self)
 
     def terminate(self, wait=False, timeout=None) -> str:
@@ -380,24 +369,16 @@ class CeleryTaskModel(models.Model):
                 for task_json in self.celery_queue_entries():
                     task = json.loads(task_json)
                     try:
-                        if (
-                            task.get("headers").get("id") == self.curr_async_result_id
-                        ):  # pragma: no branch
-                            conn.default_channel.client.lrem(
-                                self.celery_task_queue, 1, task_json
-                            )
+                        if task.get("headers").get("id") == self.curr_async_result_id:  # pragma: no branch
+                            conn.default_channel.client.lrem(self.celery_task_queue, 1, task_json)
                             break
                     except AttributeError:  # pragma: no cover
                         pass
-                conn.default_channel.client.delete(
-                    f"celery-task-meta-{self.curr_async_result_id}"
-                )
+                conn.default_channel.client.delete(f"celery-task-meta-{self.curr_async_result_id}")
             self.curr_async_result_id = None
             st = self.CANCELED
         elif self.async_result:
-            self.async_result.revoke(
-                terminate=True, signal="SIGKILL", wait=wait, timeout=timeout
-            )
+            self.async_result.revoke(terminate=True, signal="SIGKILL", wait=wait, timeout=timeout)
             st = self.REVOKED
         else:
             self.curr_async_result_id = None
@@ -430,29 +411,11 @@ class AsyncJobModel(CeleryTaskModel):
     type = models.CharField(max_length=50, choices=JobType.choices)
     config = models.JSONField(default=dict, blank=True)
     action = models.CharField(max_length=500, blank=True, null=True)
-    description = models.CharField(max_length=255, blank=True, null=True)
     sentry_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         abstract = True
         permissions = (("debug_job", "Can debug background jobs"),)
-
-    def __str__(self):
-        return self.description or f"Background Job #{self.pk}"
-
-    @property
-    def queue_position(self) -> int:
-        try:
-            return super().queue_position
-        except Exception:
-            return 0
-
-    @property
-    def started(self) -> str:
-        try:
-            return self.task_info["started_at"]
-        except Exception:
-            return "="
 
     def execute(self):
         sid = None
