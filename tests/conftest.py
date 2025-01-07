@@ -45,7 +45,6 @@ def pytest_configure(config):
 
 @pytest.fixture(autouse=True)
 def reset_queue():
-    # from demo.celery import app
     from demo.models import Job
 
     Job.purge()
@@ -54,7 +53,7 @@ def reset_queue():
         conn.default_channel.client.delete(CELERY_TASK_REVOKED_QUEUE)
 
 
-@pytest.fixture()
+@pytest.fixture
 def std_user(db) -> "User":
     from demo.factories import UserFactory
 

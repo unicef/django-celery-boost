@@ -8,8 +8,6 @@ from celery.result import AsyncResult
 from demo.factories import AsyncJobModelFactory, JobFactory
 from demo.models import Job
 
-from django_celery_boost.models import CeleryTaskModel
-
 
 def test_model_initialize_new(db):
     job: Job = Job()
@@ -32,8 +30,6 @@ def test_model_initialize_new(db):
 
 
 def test_model_queue(db):
-    # from celery import current_app
-
     job1: Job = JobFactory()
     job2: Job = JobFactory()
 

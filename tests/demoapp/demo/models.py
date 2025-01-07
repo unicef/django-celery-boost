@@ -7,9 +7,6 @@ class Job(CeleryTaskModel, models.Model):
     name = models.CharField(max_length=100)
     number = models.IntegerField(default=0)
 
-    class Meta(CeleryTaskModel.Meta):
-        verbose_name = "Job"
-
     op = models.CharField(
         max_length=100,
         choices=(
@@ -25,12 +22,21 @@ class Job(CeleryTaskModel, models.Model):
 
     celery_task_name = "demo.tasks.process_job"
 
+    class Meta(CeleryTaskModel.Meta):
+        verbose_name = "Job"
+
+    def __str__(self):
+        return self.description or f"Background Job #{self.pk}"
+
 
 class AlternativeJob(CeleryTaskModel, models.Model):
     class Meta(CeleryTaskModel.Meta):
         permissions = (("test_alternativejob", "Can test AlternativeJob"),)
 
     celery_task_name = "demo.tasks.process_job"
+
+    def __str__(self):
+        return self.description or f"Background Job #{self.pk}"
 
 
 class MultipleJob(AsyncJobModel):

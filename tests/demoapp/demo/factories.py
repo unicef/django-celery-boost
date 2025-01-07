@@ -56,7 +56,7 @@ class GroupFactory(DjangoModelFactory):
             instance.save()
 
 
-class user_grant_permission:
+class user_grant_permission:  # noqa
     def __init__(self, user: User, permissions: Optional[list[str]] = None):
         self.user = user
         self.permissions = permissions
@@ -77,8 +77,7 @@ class user_grant_permission:
 
     def start(self):
         """Activate a patch, returning any created mock."""
-        result = self.__enter__()
-        return result
+        return self.__enter__()
 
     def stop(self):
         """Stop an active patch."""
