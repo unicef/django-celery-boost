@@ -28,9 +28,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "version",
-                    concurrency.fields.AutoIncVersionField(
-                        default=0, help_text="record revision number"
-                    ),
+                    concurrency.fields.AutoIncVersionField(default=0, help_text="record revision number"),
                 ),
                 (
                     "description",
@@ -58,9 +56,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "datetime_created",
-                    models.DateTimeField(
-                        auto_now_add=True, help_text="Creation date and time"
-                    ),
+                    models.DateTimeField(auto_now_add=True, help_text="Creation date and time"),
                 ),
                 (
                     "datetime_queued",
@@ -143,9 +139,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "version",
-                    concurrency.fields.AutoIncVersionField(
-                        default=0, help_text="record revision number"
-                    ),
+                    concurrency.fields.AutoIncVersionField(default=0, help_text="record revision number"),
                 ),
                 (
                     "description",
@@ -173,9 +167,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "datetime_created",
-                    models.DateTimeField(
-                        auto_now_add=True, help_text="Creation date and time"
-                    ),
+                    models.DateTimeField(auto_now_add=True, help_text="Creation date and time"),
                 ),
                 (
                     "datetime_queued",
@@ -275,9 +267,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "version",
-                    concurrency.fields.AutoIncVersionField(
-                        default=0, help_text="record revision number"
-                    ),
+                    concurrency.fields.AutoIncVersionField(default=0, help_text="record revision number"),
                 ),
                 (
                     "description",
@@ -305,9 +295,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "datetime_created",
-                    models.DateTimeField(
-                        auto_now_add=True, help_text="Creation date and time"
-                    ),
+                    models.DateTimeField(auto_now_add=True, help_text="Creation date and time"),
                 ),
                 (
                     "datetime_queued",

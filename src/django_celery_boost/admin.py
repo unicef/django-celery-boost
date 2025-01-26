@@ -1,4 +1,4 @@
-from typing import Any, Optional, Sequence
+from typing import Any, Sequence
 
 from admin_extra_buttons.decorators import button
 from admin_extra_buttons.mixins import ExtraButtonsMixin, confirm_action
@@ -19,7 +19,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     inspect_template = None
     queue_template = None
 
-    def get_readonly_fields(self, request: HttpRequest, obj: "Optional[Model]" = None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Model | None = None) -> Sequence[str]:
         ret = list(super().get_readonly_fields(request, obj))
         ret.append("curr_async_result_id")
         return ret
@@ -53,7 +53,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             ctx,
         )
 
-    def has_queue_permission(self, perm, request: HttpRequest, o: Optional[CeleryTaskModel]) -> bool:
+    def has_queue_permission(self, perm, request: HttpRequest, o: CeleryTaskModel | None) -> bool:
         perm = "%s.%s_%s" % (
             self.model._meta.app_label,
             perm,
@@ -83,7 +83,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         return self._celery_terminate(request, pk)
 
     def _celery_queue(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
-        obj: Optional[CeleryTaskModel]
+        obj: CeleryTaskModel | None
         obj = self.get_object(request, pk)
 
         ctx = self.get_common_context(request, pk, title=f"Confirm queue action for {obj}")
@@ -100,10 +100,10 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
 
         if obj.is_queued():
             self.message_user(request, "Task has already been queued.", messages.WARNING)
-            return
+            return None
         if obj.is_terminated() and not obj.repeatable:
             self.message_user(request, "Task is already terminated.", messages.WARNING)
-            return
+            return None
 
         return confirm_action(
             self,
@@ -122,15 +122,15 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         )
 
     def _celery_revoke(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
-        obj: Optional[CeleryTaskModel]
+        obj: CeleryTaskModel | None
         obj = self.get_object(request, pk)
 
         if not obj.is_queued():
             self.message_user(request, "Task not queued.", messages.WARNING)
-            return
+            return None
         if obj.is_terminated():
             self.message_user(request, "Task is already terminated.", messages.WARNING)
-            return
+            return None
         ctx = self.get_common_context(request, pk, title=f"Confirm revoking action for {obj}")
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
@@ -161,10 +161,10 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         obj: CeleryTaskModel = self.get_object(request, pk)
         if not obj.is_queued():
             self.message_user(request, "Task not queued.", messages.WARNING)
-            return
+            return None
         if obj.is_terminated():
             self.message_user(request, "Task is already terminated.", messages.WARNING)
-            return
+            return None
         ctx = self.get_common_context(request, pk, title=f"Confirm termination request for {obj}")
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:

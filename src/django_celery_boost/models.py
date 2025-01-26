@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Generator, Optional
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import sentry_sdk
 from celery import states
@@ -32,19 +32,6 @@ class CeleryManager:
 
 
 class CeleryTaskModel(models.Model):
-    class Meta:
-        abstract = True
-        default_permissions = (
-            "add",
-            "change",
-            "delete",
-            "view",
-            "queue",
-            "terminate",
-            "inspect",
-            "revoke",
-        )
-
     STARTED = states.STARTED  # (task has been started)
     SUCCESS = states.SUCCESS  # (task executed successfully)
     PENDING = states.PENDING  # (waiting for execution or unknown task id)
@@ -113,13 +100,26 @@ class CeleryTaskModel(models.Model):
     """Name of the queue where revoked tasks are stored.
     Only need to be specified if different from `settings.CELERY_TASK_REVOKED_QUEUE`"""
 
-    _celery_app: Optional[Celery] = None
+    _celery_app: Celery | None = None
+
+    class Meta:
+        abstract = True
+        default_permissions = (
+            "add",
+            "change",
+            "delete",
+            "view",
+            "queue",
+            "terminate",
+            "inspect",
+            "revoke",
+        )
 
     def __str__(self):
         return self.description or f"Background Job #{self.pk}"
 
     @classproperty
-    def celery_app(cls) -> "celery.app.base.Celery":
+    def celery_app(cls) -> "celery.app.base.Celery":  # noqa
         if not cls._celery_app:
             from celery import current_app as app
 
@@ -152,7 +152,7 @@ class CeleryTaskModel(models.Model):
                 )
             else:
                 cls.celery_app.autodiscover_tasks()
-                if cls.celery_task_name not in cls.celery_app.tasks.keys():
+                if cls.celery_task_name not in cls.celery_app.tasks:
                     errors.append(
                         checks.Error(
                             "'%s' is using a non registered Celery task. (%s)" % (cls._meta, cls.celery_task_name),
@@ -174,11 +174,11 @@ class CeleryTaskModel(models.Model):
 
     @property
     def queue_position(self) -> int:
-        """
-        Returns the position of the current task in the queue.
+        """Return the position of the current task in the queue.
 
         Returns:
             int task position in queue
+
         """
         if self.is_terminated():
             return 0
@@ -193,17 +193,16 @@ class CeleryTaskModel(models.Model):
     @classmethod
     def celery_queue_entries(cls) -> "Generator":
         with cls.celery_app.pool.acquire(block=True) as conn:
-            for entry in conn.default_channel.client.lrange(cls.celery_task_queue, 0, -1):
-                yield entry
+            yield from conn.default_channel.client.lrange(cls.celery_task_queue, 0, -1)
 
     @classmethod
     def celery_queue_info(cls) -> "dict[str, int]":
-        """Returns information about the Queue
+        """Return information about the queue.
 
         Returns:
-            Dictionary with size,pendig, canceled, revoked tasks
-        """
+            Dictionary with size,pending, canceled, revoked tasks
 
+        """
         conn: Connection
         channel: Channel
         with cls.celery_app.pool.acquire(block=True) as conn:
@@ -222,15 +221,14 @@ class CeleryTaskModel(models.Model):
 
     @property
     def async_result(self) -> "AsyncResult|None":
-        """Returns the AsyncResult object of the current instance"""
+        """Return the AsyncResult object of the current instance."""
         if self.curr_async_result_id:
             return AsyncResult(self.curr_async_result_id)
-        else:
-            return None
+        return None
 
     @property
     def queue_entry(self) -> "dict[str, Any]":
-        """Returns the queue entry of the current instance"""
+        """Return the queue entry of the current instance."""
         if self.async_result:
             for task in self.celery_queue_entries():
                 j = json.loads(task)
@@ -241,10 +239,11 @@ class CeleryTaskModel(models.Model):
 
     @property
     def task_info(self) -> "dict[str, Any]":
-        """Returns the task meta information of the current instance
+        """Return the task meta information of the current instance.
 
         Returns:
             Dictionary with task information
+
         """
         ret = {"status": self.task_status, "completed_at": ""}
         if self.async_result:
@@ -268,7 +267,6 @@ class CeleryTaskModel(models.Model):
                 query_result_id = None
             return {
                 **info,
-                # "id": self.async_result.id,
                 "started_at": started_at,
                 "completed_at": date_done,
                 "last_update": date_done,
@@ -286,12 +284,12 @@ class CeleryTaskModel(models.Model):
             return "="
 
     @classproperty
-    def task_handler(cls: "type[CeleryTaskModel]") -> "Callable[[Any], Any]":
-        """Return the task assigned to this model"""
+    def task_handler(cls: "type[CeleryTaskModel]") -> "Callable[[Any], Any]":  # noqa
+        """Return the task assigned to this model."""
         return import_string(cls.celery_task_name)
 
     def is_queued(self) -> bool:
-        """Check if the job is queued"""
+        """Check if the job is queued."""
         try:
             with self.celery_app.pool.acquire(block=True) as conn:
                 tasks = conn.default_channel.client.lrange(self.celery_task_queue, 0, -1)
@@ -304,7 +302,7 @@ class CeleryTaskModel(models.Model):
         return False
 
     def is_terminated(self) -> bool:
-        """Check if the job is queued"""
+        """Check if the job is queued."""
         return self.task_status and self.task_status in self.TERMINATED_STATUSES
 
     def log_task_action(self, action, user):
@@ -320,7 +318,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def task_status(self) -> str:
-        """Returns the task status querying Celery API"""
+        """Return the task status querying Celery API."""
         try:
             if self.curr_async_result_id:
                 result = self.async_result.state
@@ -332,14 +330,13 @@ class CeleryTaskModel(models.Model):
             else:
                 result = self.NOT_SCHEDULED
             return result
-        except Exception as e:
+        except Exception as e:  # noqa
             return str(e)
 
     def queue(self, use_version: bool = True) -> str | None:
         """Queue the record processing.
 
-        Parameters:
-            use_version: if True the task fails if the record is changed after it has been queued.
+        use_version: if True the task fails if the record is changed after it has been queued.
         """
         if self.task_status not in self.ACTIVE_STATUSES:
             res = self.task_handler.delay(self.pk, self.version if use_version else None)
@@ -357,7 +354,7 @@ class CeleryTaskModel(models.Model):
         task_revoked.send(sender=self.__class__, task=self)
 
     def terminate(self, wait=False, timeout=None) -> str:
-        """Revoke the task. Does not need Running workers"""
+        """Revoke the task. Does not need Running workers."""
         if self.task_status in ["QUEUED", "PENDING"]:
             with self.celery_app.pool.acquire(block=True) as conn:
                 conn.default_channel.client.sadd(

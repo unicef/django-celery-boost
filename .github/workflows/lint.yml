@@ -29,10 +29,10 @@ jobs:
       lint: ${{steps.changes.outputs.lint }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4
       - id: changes
         name: Check for file changes
-        uses: dorny/paths-filter@0bc4621a3135347011ad047f9ecf449bf72ce2bd # v3.0.0
+        uses: dorny/paths-filter@v3
         with:
           base: ${{ github.ref }}
           token: ${{ github.token }}
@@ -47,7 +47,7 @@ jobs:
     if: needs.changes.outputs.lint
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -55,8 +55,11 @@ jobs:
           python-version: 3.12
           architecture: 'x64'
       - uses: yezz123/setup-uv@v4
+        with:
+          version: "latest"
       - name: lint
         if: needs.changes.outputs.lint
         run: |
-          uv run isort src/ --check-only
-          uv run flake8 src/
+          pip install ruff
+          ruff check -e
+          ruff format --check

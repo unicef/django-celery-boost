@@ -8,14 +8,14 @@ from django.urls import reverse
 pytestmark = [pytest.mark.admin]
 
 
-@pytest.fixture()
+@pytest.fixture
 def job():
     from demo.factories import JobFactory
 
     return JobFactory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def queued():
     from demo.factories import JobFactory
 
@@ -40,18 +40,6 @@ def test_celery_change(django_app, std_user, job):
     assert res.status_code == 200
 
 
-# def test_celery_discard_all(django_app, std_user):
-#     url = reverse("admin:demo_job_celery_discard_all")
-#     res = django_app.get(url, user=std_user)
-#     assert res.status_code == 302
-
-
-# def test_celery_purge(django_app, std_user):
-#     url = reverse("admin:demo_job_celery_purge")
-#     res = django_app.get(url, user=std_user)
-#     assert res.status_code == 302
-
-
 def test_celery_inspect(django_app, std_user, job):
     url = reverse("admin:demo_job_celery_inspect", args=[job.pk])
     job.queue()
@@ -61,14 +49,6 @@ def test_celery_inspect(django_app, std_user, job):
     with user_grant_permission(std_user, ["demo.inspect_job"]):
         res = django_app.get(url, user=std_user)
         assert res.status_code == 200
-
-
-# def test_celery_result(request, django_app, admin_user, job):
-#     url = reverse("admin:demo_job_celery_result", args=[job.pk])
-#     job.queue()
-#     res = django_app.get(url, user=admin_user)
-#     assert res.status_code == 302
-#
 
 
 def test_celery_queue(request, django_app, std_user, job):

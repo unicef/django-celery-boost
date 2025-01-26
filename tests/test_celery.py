@@ -3,9 +3,8 @@ from time import sleep
 from unittest.mock import patch
 
 import pytest
-from demo.factories import GroupFactory, JobFactory
+from demo.factories import JobFactory
 from demo.models import Job, MultipleJob
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 
 from django_celery_boost.models import AsyncJobModel
@@ -31,7 +30,7 @@ def celery_worker_parameters():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def celery_app(celery_app):
     from demo.models import Job
 
@@ -58,18 +57,6 @@ def test_tasks_fail(transactional_db, celery_app, celery_worker):
     assert job1.task_info["traceback"]
     assert job1.task_info["date_done"]
     assert job1.task_info["error"] == job1.name
-
-
-#
-# def test_task_terminate(transactional_db):
-#     job1: Job = JobFactory(name="Progress", op="progress", value=5)
-#
-#     aid = job1.curr_async_result_id
-#     job1.queue()
-#     job1.terminate()
-#     assert list(job1.celery_queue_entries()) == []
-#     job1.terminate()
-#
 
 
 def test_tasks_progress(transactional_db, celery_app, celery_worker):
@@ -212,6 +199,6 @@ def test_async_raise(mock, transactional_db, celery_app, celery_worker, reset_qu
     async_job: MultipleJob = AsyncJobModelFactory(type=AsyncJobModel.JobType.JOB_TASK, action="demo.tasks.raise_task")
 
     mock.return_value = 1
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa
         async_job.execute()
     assert async_job.sentry_id == 1

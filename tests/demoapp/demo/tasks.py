@@ -22,7 +22,7 @@ def process_job(self, pk, version=None):
             time.sleep(0.5)
     elif job.op == "loop":
         start = time.time()
-        for i in range(job.value):
+        for _ in range(job.value):
             time.sleep(1)
         elapsed = time.time() - start
         return {"loops": job.value, "elapsed": elapsed}

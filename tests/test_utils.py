@@ -31,8 +31,3 @@ def test_discard_all(db):
 
 def test_purge(db):
     Job.purge()
-
-
-#
-# def test_celery_stats(db):
-#     Job.celery_stats()

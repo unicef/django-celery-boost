@@ -136,11 +136,8 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CELERY_ACCEPT_CONTENT = ["pickle", "json", "application/text", "application/json"]
-# CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": int(CELERY_BROKER_VISIBILITY_VAR)}
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_BROKER_VISIBILITY_VAR = os.environ.get("CELERY_VISIBILITY_TIMEOUT", 5)
-
-# CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers.DatabaseScheduler"
 
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_ALWAYS_EAGER = False
@@ -157,8 +154,6 @@ CELERY_WORKER_DISABLE_RATE_LIMITS = False
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 CELERY_SEND_TASK_ERROR_EMAILS = False
-
-# CELERY_CACHE_BACKEND = "django-cache"
 
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_RESULT_EXPIRES = None
