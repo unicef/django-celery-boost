@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import factory
-from demo.models import Job
+from demo.models import Job, MultipleJob
 from django.contrib.auth.models import Group, Permission, User
 from factory.django import DjangoModelFactory
 from factory.faker import Faker
@@ -16,6 +16,14 @@ class JobFactory(DjangoModelFactory):
 
     class Meta:
         model = Job
+
+
+class AsyncJobModelFactory(DjangoModelFactory):
+    curr_async_result_id = None
+    last_async_result_id = None
+
+    class Meta:
+        model = MultipleJob
 
 
 class UserFactory(DjangoModelFactory):
@@ -40,9 +48,7 @@ class GroupFactory(DjangoModelFactory):
         if extracted:
             for perm_name in extracted:
                 app, perm = perm_name.split(".")
-                self.permissions.add(
-                    Permission.objects.get(content_type__app_label=app, codename=perm)
-                )
+                self.permissions.add(Permission.objects.get(content_type__app_label=app, codename=perm))
 
     @classmethod
     def _after_postgeneration(cls, instance, create, results=None):

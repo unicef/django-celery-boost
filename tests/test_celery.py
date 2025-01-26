@@ -1,9 +1,15 @@
 import os
 from time import sleep
+from unittest.mock import patch
 
 import pytest
-from demo.factories import JobFactory
-from demo.models import Job
+from demo.factories import GroupFactory, JobFactory
+from demo.models import Job, MultipleJob
+from django.contrib.auth.models import Group
+from django.core.cache import cache
+
+from django_celery_boost.models import AsyncJobModel
+from tests.demoapp.demo.factories import AsyncJobModelFactory
 
 pytest_plugins = ("celery.contrib.pytest",)
 
@@ -148,9 +154,7 @@ def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queu
     }
 
 
-def test_celery_queue_status_workers(
-    transactional_db, celery_app, celery_worker, reset_queue
-):
+def test_celery_queue_status_workers(transactional_db, celery_app, celery_worker, reset_queue):
     assert Job.get_queue_size() == 0
     job1: Job = JobFactory()
     job2: Job = JobFactory()
@@ -181,3 +185,33 @@ def test_revoke(transactional_db, celery_app, celery_worker, reset_queue):
     job1.queue()
     job1.revoke()
     assert job1.task_status == Job.MISSING
+
+
+def test_async_job_standard(transactional_db, celery_app, celery_worker, reset_queue):
+    async_job: MultipleJob = AsyncJobModelFactory(
+        type=AsyncJobModel.JobType.STANDARD_TASK,
+        config={"key": "key", "value": "value"},
+        action="demo.tasks.cache_store",
+    )
+
+    assert cache.get("key") is None
+    async_job.execute()
+    assert cache.get("key") == "value"
+
+
+@patch("demo.tasks.echo")
+def test_async_job_task(mocked_value, transactional_db, celery_app, celery_worker, reset_queue):
+    async_job: MultipleJob = AsyncJobModelFactory(type=AsyncJobModel.JobType.JOB_TASK, action="demo.tasks.echo")
+
+    async_job.execute()
+    assert mocked_value.call_count == 1
+
+
+@patch("django_celery_boost.models.sentry_sdk.capture_exception")
+def test_async_raise(mock, transactional_db, celery_app, celery_worker, reset_queue):
+    async_job: MultipleJob = AsyncJobModelFactory(type=AsyncJobModel.JobType.JOB_TASK, action="demo.tasks.raise_task")
+
+    mock.return_value = 1
+    with pytest.raises(Exception):
+        async_job.execute()
+    assert async_job.sentry_id == 1
