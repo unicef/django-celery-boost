@@ -1,0 +1,35 @@
+0.6
+---
+* add AsyncJobModel
+
+
+0.5
+---
+* rename `celery_result` as `local_status`
+* add `datetime_queued`, `datetime_created`, `repeatable`, `owner`, `group_key`
+* add signals
+* add property verbose_status
+
+
+0.4.1
+---
+* fixes deps version
+
+
+0.4
+---
+* ModelAdmin changes
+
+0.3
+---
+* improve template customization
+
+0.2
+---
+* Add custom permissions
+* Renamed some fields to avoid clashing
+* add revoke() support
+
+0.1
+---
+* Initial Release

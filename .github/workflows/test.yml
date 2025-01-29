@@ -1,0 +1,132 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - '**'        # matches every branch
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}-test"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  id-token: write
+  attestations: write
+
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      run_tests: ${{steps.changes.outputs.run_tests }}
+      lint: ${{steps.changes.outputs.lint }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - id: changes
+        name: Check for file changes
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.ref }}
+          token: ${{ github.token }}
+          filters: .github/file-filters.yml
+
+  ci:
+    runs-on: ubuntu-latest
+    name: Test py${{ matrix.python-version }}/dj${{matrix.django-version}}
+    services:
+      redis:
+        image: redis
+        ports:
+          - 16379:6379
+      postgres:
+        image: postgres
+        ports:
+          - 15432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: django_celery_boost
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      max-parallel: 1
+      matrix:
+        python-version: [ "3.11", "3.12", "3.13" ]
+        django-version: [ "4.2", "5.1" ]
+      fail-fast: true
+    needs: [ changes ]
+    if: needs.changes.outputs.run_tests || needs.changes.outputs.lint
+    env:
+      CELERY_BROKER_URL: redis://localhost:16379/0
+      DB_HOST: "localhost"
+      DB_PORT: 15432
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: 'x64'
+      - name: Restore cached venv
+        id: cache-venv-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache-uv/
+            .venv/
+          key: ${{ matrix.python-version }}-${{matrix.django-version}}-${{ hashFiles('pyproject.toml') }}-venv
+
+      - uses: yezz123/setup-uv@v4
+        with:
+          python:  ${{ matrix.python-version }}
+
+      - name: Test
+#        if: needs.changes.outputs.run_tests
+        run: |
+          uv add "django==${{ matrix.django-version }}.*"
+          uv run --cache-dir .cache-uv/ \
+              python -m pytest tests/ \
+                --junit-xml junit-${{ matrix.python-version }}-${{matrix.django-version}}.xml \
+                --cov --cov-report xml
+      - name: Cache venv
+        if: steps.cache-venv-restore.outputs.cache-hit != 'true'
+        id: cache-venv-save
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache-uv/
+            .venv/
+          key: ${{ matrix.python-version }}-${{matrix.django-version}}-${{ hashFiles('pyproject.toml') }}-venv
+
+      - name: Upload pytest test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results-${{ matrix.python-version }}-${{matrix.django-version}}
+          path: junit-${{ matrix.python-version }}-${{matrix.django-version}}.xml
+        if: ${{ always() }}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: matrix.python-version == 3.12
+        continue-on-error: true
+        with:
+          env_vars: OS,PYTHON
+          fail_ci_if_error: true
+          flags: unittests
+          files: ./coverage.xml
+          verbose: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+          name: codecov-${{env.GITHUB_REF_NAME}}
