@@ -223,7 +223,7 @@ class CeleryTaskModel(models.Model):
     def async_result(self) -> "AsyncResult|None":
         """Return the AsyncResult object of the current instance."""
         if self.curr_async_result_id:
-            return AsyncResult(self.curr_async_result_id)
+            return self.celery_app.AsyncResult(self.curr_async_result_id)
         return None
 
     @property

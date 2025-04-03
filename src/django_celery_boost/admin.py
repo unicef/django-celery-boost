@@ -109,8 +109,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             self,
             request,
             doit,
-            "Do you really want to queue this task?",
-            "Queued",
+            message="Do you really want to queue this task?",
+            success_message="Queued",
             extra_context=ctx,
             description="",
             template=self.queue_template
@@ -146,8 +146,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             self,
             request,
             doit,
-            "Do you really want to queue this task?",
-            "Revoked",
+            message="Do you really want to queue this task?",
+            success_message="Revoked",
             extra_context=ctx,
             description="",
             template=[
@@ -182,8 +182,8 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             self,
             request,
             doit,
-            "Do you really want to terminate this task?",
-            None,
+            message="Do you really want to terminate this task?",
+            success_message=None,
             extra_context=ctx,
             description="",
             template=self.terminate_template
