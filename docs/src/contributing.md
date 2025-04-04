@@ -20,9 +20,9 @@ Install [uv](https://docs.astral.sh/uv/)
 
     celery -A demo.celery.app worker -l debug &
     celery -A demo.celery flower &
-    
+
     tests/demoapp/manage.py runserver
 
-!!! note 
+!!! note
 
     You can login in the demo application as superuser using any username/password

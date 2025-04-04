@@ -3,6 +3,8 @@ include CHANGES
 include LICENSE
 include MANIFEST.in
 
-recursive-include docs *
-recursive-include src/ *
+recursive-include src *
+
+
 recursive-exclude tests *
+recursive-exclude docs *

@@ -61,8 +61,8 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        python-version: [ "3.11", "3.12", "3.13" ]
-        django-version: [ "4.2", "5.1" ]
+        cfg: [ "d52-py310", "d42-py39" ]
+
       fail-fast: true
     needs: [ changes ]
     if: needs.changes.outputs.run_tests || needs.changes.outputs.lint
@@ -72,6 +72,7 @@ jobs:
       DB_PORT: 15432
       DB_USER: "postgres"
       DB_PASSWORD: "postgres"
+      DATABASE_URL: "postgres://postgres:postgres@localhost:5432/celery_model"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -87,40 +88,39 @@ jobs:
           path: |
             .cache-uv/
             .venv/
-          key: ${{ matrix.python-version }}-${{matrix.django-version}}-${{ hashFiles('pyproject.toml') }}-venv
+          key: ${{ matrix.cfg}}-${{ hashFiles('pyproject.toml') }}-venv
 
       - uses: yezz123/setup-uv@v4
-        with:
-          python:  ${{ matrix.python-version }}
 
-      - name: Test
-#        if: needs.changes.outputs.run_tests
-        run: |
-          uv add "django==${{ matrix.django-version }}.*"
-          uv run --cache-dir .cache-uv/ \
-              python -m pytest tests/ \
-                --junit-xml junit-${{ matrix.python-version }}-${{matrix.django-version}}.xml \
-                --cov --cov-report xml
-      - name: Cache venv
-        if: steps.cache-venv-restore.outputs.cache-hit != 'true'
-        id: cache-venv-save
-        uses: actions/cache/save@v4
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: |
-            .cache-uv/
-            .venv/
-          key: ${{ matrix.python-version }}-${{matrix.django-version}}-${{ hashFiles('pyproject.toml') }}-venv
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+          cache-suffix: ${{ matrix.cfg }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install tox
+        run: uv tool install --python-preference only-managed --python 3.13 tox --with tox-uv --with tox-gh-actions
+
+      - name: Setup test suite
+        run: tox run -vv --notest --skip-missing-interpreters false -e ${{ matrix.cfg }}
+
+      - name: Run test suite ${{ matrix.cfg }}
+        run: tox -e ${{ matrix.cfg }}
 
       - name: Upload pytest test results
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-results-${{ matrix.python-version }}-${{matrix.django-version}}
-          path: junit-${{ matrix.python-version }}-${{matrix.django-version}}.xml
+          name: pytest-results-${{ matrix.cfg }}
+          path: junit-${{ matrix.cfg }}.xml
         if: ${{ always() }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: matrix.python-version == 3.12
         continue-on-error: true
         with:
           env_vars: OS,PYTHON

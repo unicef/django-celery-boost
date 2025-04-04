@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import json
 import logging
@@ -6,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Callable, Generator
 import sentry_sdk
 from celery import states
 from celery.app.base import Celery
-from celery.result import AsyncResult
 from concurrency.api import concurrency_disable_increment
 from concurrency.fields import AutoIncVersionField
 from django.conf import settings
@@ -21,6 +22,7 @@ from django_celery_boost.signals import task_queued, task_revoked, task_terminat
 
 if TYPE_CHECKING:
     import celery.app.control
+    from celery.result import AsyncResult
     from kombu.connection import Connection
     from kombu.transport.redis import Channel
 
@@ -418,11 +420,10 @@ class AsyncJobModel(CeleryTaskModel):
         sid = None
         try:
             func = import_string(self.action)
-            match self.type:
-                case AsyncJobModel.JobType.STANDARD_TASK:
-                    return func(**self.config)
-                case AsyncJobModel.JobType.JOB_TASK:
-                    return func(self)
+            if self.type == AsyncJobModel.JobType.STANDARD_TASK:
+                return func(**self.config)
+            if self.type == AsyncJobModel.JobType.JOB_TASK:
+                return func(self)
         except Exception as e:
             sid = sentry_sdk.capture_exception(e)
             raise e

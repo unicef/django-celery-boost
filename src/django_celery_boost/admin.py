@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Sequence
 
 from admin_extra_buttons.decorators import button
