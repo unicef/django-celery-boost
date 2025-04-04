@@ -11,11 +11,10 @@ uv.lock
 !.git
 !tests/.coveragerc
 !.github
-!.flake8
 !.gitignore
-!.github/
 !.mypy.ini
 !.pre-commit-config.yaml
 !bandit.yaml
 coverage.xml
 Makefile
+src/django_celery_boost/version.py
