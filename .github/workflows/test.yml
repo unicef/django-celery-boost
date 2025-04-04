@@ -72,7 +72,6 @@ jobs:
       DB_PORT: 15432
       DB_USER: "postgres"
       DB_PASSWORD: "postgres"
-      DATABASE_URL: "postgres://postgres:postgres@localhost:5432/celery_model"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
