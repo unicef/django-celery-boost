@@ -41,7 +41,7 @@ jobs:
 
   ci:
     runs-on: ubuntu-latest
-    name: Test py${{ matrix.python-version }}/dj${{matrix.django-version}}
+    name: Test ${{ matrix.cfg }}
     services:
       redis:
         image: redis
@@ -75,7 +75,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
