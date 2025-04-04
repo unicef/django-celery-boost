@@ -3,13 +3,20 @@ line-length = 120
 
 [lint.isort]
 case-sensitive = true
+known-first-party = ["django_celery_boost"]
 
 [lint]
 select = [
 ]
 ignore = [
-    "ALL"
+  "ALL"
 ]
+preview = true
+
+[lint.pylint]
+max-args = 7
+max-branches = 14
+max-nested-blocks = 8
 
 [format]
 quote-style = "double"
