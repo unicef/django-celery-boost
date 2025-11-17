@@ -44,3 +44,21 @@ class MultipleJob(AsyncJobModel):
         permissions = (("test_multiplejob", "Can test MultipleJob"),)
 
     celery_task_name = "demo.tasks.process_job"
+
+
+class ValueJob(CeleryTaskModel, models.Model):
+    value = models.IntegerField(default=0)
+
+    celery_task_name = "demo.tasks.value"
+
+
+class AddToJob(CeleryTaskModel, models.Model):
+    value = models.IntegerField(default=0)
+
+    celery_task_name = "demo.tasks.add_to"
+
+
+class SumAndAddToJob(CeleryTaskModel, models.Model):
+    value = models.IntegerField(default=0)
+
+    celery_task_name = "demo.tasks.sum_and_add_to"

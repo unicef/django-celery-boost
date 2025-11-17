@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import sentry_sdk
-from celery import states
+from celery import states, Signature
 from celery.app.base import Celery
 from concurrency.api import concurrency_disable_increment
 from concurrency.fields import AutoIncVersionField
@@ -19,6 +19,7 @@ from django.utils.module_loading import import_string
 from django.utils.translation import gettext as _
 
 from django_celery_boost.signals import task_queued, task_revoked, task_terminated
+from django_celery_boost.task import TaskRunFromSignature
 
 if TYPE_CHECKING:
     import celery.app.control
@@ -27,6 +28,17 @@ if TYPE_CHECKING:
     from kombu.transport.redis import Channel
 
 logger = logging.getLogger(__name__)
+
+
+APP_LABEL = "app_label"
+MODEL_NAME = "model_name"
+
+
+class InvalidTaskBase(TypeError):
+    def __init__(self, task_handler_name: str):
+        super().__init__(
+            f"{task_handler_name} must be a TaskRunFromSignature instance. Use base argument with shared_task or app.task decorator."
+        )
 
 
 class CeleryManager:
@@ -335,6 +347,13 @@ class CeleryTaskModel(models.Model):
         except Exception as e:  # noqa
             return str(e)
 
+    def set_queued(self, result: AsyncResult) -> None:
+        with concurrency_disable_increment(self):
+            self.curr_async_result_id = result.id
+            self.datetime_queued = timezone.now()
+            self.save(update_fields=["curr_async_result_id", "datetime_queued"])
+            task_queued.send(sender=self.__class__, task=self)
+
     def queue(self, use_version: bool = True) -> str | None:
         """Queue the record processing.
 
@@ -342,11 +361,7 @@ class CeleryTaskModel(models.Model):
         """
         if self.task_status not in self.ACTIVE_STATUSES:
             res = self.task_handler.delay(self.pk, self.version if use_version else None)
-            with concurrency_disable_increment(self):
-                self.curr_async_result_id = res.id
-                self.datetime_queued = timezone.now()
-                self.save(update_fields=["curr_async_result_id", "datetime_queued"])
-                task_queued.send(sender=self.__class__, task=self)
+            self.set_queued(res)
             return self.curr_async_result_id
         return None
 
@@ -387,6 +402,21 @@ class CeleryTaskModel(models.Model):
         self.save(update_fields=["local_status", "curr_async_result_id"])
         task_terminated.send(sender=self.__class__, task=self)
         return st
+
+    def signature(self) -> Signature:
+        if not isinstance(self.task_handler, TaskRunFromSignature):
+            raise InvalidTaskBase(self.celery_task_name)
+
+        return self.task_handler.signature(
+            (self.pk, self.version),
+            {
+                APP_LABEL: self._meta.app_label,
+                MODEL_NAME: self._meta.model_name,
+            },
+        )
+
+    def s(self) -> Signature:
+        return self.signature()
 
     @classmethod
     def discard_all(cls: "type[CeleryTaskModel]") -> None:

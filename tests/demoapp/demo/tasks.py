@@ -4,6 +4,8 @@ from celery import shared_task
 from concurrency.exceptions import RecordModifiedError
 from django.core.cache import cache
 
+from django_celery_boost.task import TaskRunFromSignature
+
 
 @shared_task(bind=True)
 def process_job(self, pk, version=None):
@@ -52,3 +54,27 @@ def cache_store(key, value):
 @shared_task()
 def raise_task(param):
     raise Exception("Boom!")
+
+
+@shared_task(base=TaskRunFromSignature)
+def value(pk: int, version: int) -> int:
+    from .models import ValueJob
+
+    job = ValueJob.objects.get(pk=pk, version=version)
+    return job.value
+
+
+@shared_task(base=TaskRunFromSignature)
+def add_to(pk: int, version: int, value: int) -> int:
+    from .models import AddToJob
+
+    job = AddToJob.objects.get(pk=pk, version=version)
+    return job.value + value
+
+
+@shared_task(base=TaskRunFromSignature)
+def sum_and_add_to(pk: int, version: int, values: list[int]) -> int:
+    from .models import SumAndAddToJob
+
+    job = SumAndAddToJob.objects.get(pk=pk, version=version)
+    return job.value + sum(values)
