@@ -35,14 +35,8 @@ def _apply[T: AsyncResult](apply_method: ApplyCallable[T], *args: Any, **kwargs:
 
 
 class TaskRunFromSignature(Task):
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return super().__call__(*args, **kwargs)
-
     def apply(self, *args: Any, **kwargs: Any) -> EagerResult:
         return _apply(super().apply, *args, **kwargs)
 
     def apply_async(self, *args: Any, **kwargs: Any) -> AsyncResult:
         return _apply(super().apply_async, *args, **kwargs)
-
-    def run(self, *args: Any, **kwargs: Any) -> Any:
-        return super().run(*args, **kwargs)
