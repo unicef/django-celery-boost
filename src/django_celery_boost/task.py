@@ -5,11 +5,11 @@ from celery.result import EagerResult, AsyncResult
 from django.apps import apps
 
 
-class ApplyCallable[T: AsyncResult](Protocol):
-    def __call__(self, *args: Any, **kwargs: Any) -> T: ...
+class ApplyCallable(Protocol):
+    def __call__(self, *args: Any, **kwargs: Any) -> AsyncResult: ...
 
 
-def _apply[T: AsyncResult](apply_method: ApplyCallable[T], *args: Any, **kwargs: Any) -> T:
+def _apply[T: AsyncResult](apply_method: ApplyCallable, *args: Any, **kwargs: Any) -> AsyncResult:
     from django_celery_boost.models import APP_LABEL, MODEL_NAME, CeleryTaskModel
 
     task_args = args[0]
@@ -36,7 +36,7 @@ def _apply[T: AsyncResult](apply_method: ApplyCallable[T], *args: Any, **kwargs:
 
 class TaskRunFromSignature(Task):
     def apply(self, *args: Any, **kwargs: Any) -> EagerResult:
-        return _apply(super().apply, *args, **kwargs)
+        return cast(EagerResult, _apply(super().apply, *args, **kwargs))
 
     def apply_async(self, *args: Any, **kwargs: Any) -> AsyncResult:
         return _apply(super().apply_async, *args, **kwargs)
