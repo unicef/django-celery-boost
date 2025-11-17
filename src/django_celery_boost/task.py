@@ -9,7 +9,7 @@ class ApplyCallable(Protocol):
     def __call__(self, *args: Any, **kwargs: Any) -> AsyncResult: ...
 
 
-def _apply[T: AsyncResult](apply_method: ApplyCallable, *args: Any, **kwargs: Any) -> AsyncResult:
+def _apply(apply_method: ApplyCallable, *args: Any, **kwargs: Any) -> AsyncResult:
     from django_celery_boost.models import APP_LABEL, MODEL_NAME, CeleryTaskModel
 
     task_args = args[0]
