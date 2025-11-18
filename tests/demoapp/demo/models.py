@@ -58,7 +58,5 @@ class AddToJob(CeleryTaskModel, models.Model):
     celery_task_name = "demo.tasks.add_to"
 
 
-class SumAndAddToJob(CeleryTaskModel, models.Model):
-    value = models.IntegerField(default=0)
-
-    celery_task_name = "demo.tasks.sum_and_add_to"
+class SumJob(CeleryTaskModel, models.Model):
+    celery_task_name = "demo.tasks.sum_"

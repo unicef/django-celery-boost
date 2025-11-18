@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import factory
-from demo.models import Job, MultipleJob, AddToJob, SumAndAddToJob, ValueJob
+from demo.models import Job, MultipleJob, AddToJob, SumJob, ValueJob
 from django.contrib.auth.models import Group, Permission, User
 from factory.django import DjangoModelFactory
 from factory.faker import Faker
@@ -100,9 +100,9 @@ class AddToJobFactory(DjangoModelFactory):
         model = AddToJob
 
 
-class SumAndAddToJobFactory(DjangoModelFactory):
+class SumJobFactory(DjangoModelFactory):
     curr_async_result_id = None
     last_async_result_id = None
 
     class Meta:
-        model = SumAndAddToJob
+        model = SumJob

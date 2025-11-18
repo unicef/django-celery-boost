@@ -3,8 +3,8 @@ from typing import cast
 from celery import chain, group, chord
 from celery.worker import WorkController
 
-from demo.factories import AddToJobFactory, SumAndAddToJobFactory, ValueJobFactory
-from demo.models import AddToJob, SumAndAddToJob, ValueJob
+from demo.factories import AddToJobFactory, SumJobFactory, ValueJobFactory
+from demo.models import AddToJob, SumJob, ValueJob
 
 pytest_plugins = ("celery.contrib.pytest",)
 
@@ -22,5 +22,5 @@ def test_group(transactional_db: None, celery_worker: WorkController) -> None:
 
 def test_chord(transactional_db: None, celery_worker: WorkController) -> None:
     value_jobs = [cast(ValueJob, ValueJobFactory(value=i)) for i in range(1, 4)]
-    sum_job = cast(SumAndAddToJob, SumAndAddToJobFactory(value=5))
-    assert chord([job.s() for job in value_jobs])(sum_job.s()).get() == 11
+    sum_job = cast(SumJob, SumJobFactory())
+    assert chord([job.s() for job in value_jobs])(sum_job.s()).get() == 6

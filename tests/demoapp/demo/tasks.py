@@ -73,8 +73,5 @@ def add_to(pk: int, version: int, value: int) -> int:
 
 
 @shared_task(base=TaskRunFromSignature)
-def sum_and_add_to(pk: int, version: int, values: list[int]) -> int:
-    from .models import SumAndAddToJob
-
-    job = SumAndAddToJob.objects.get(pk=pk, version=version)
-    return job.value + sum(values)
+def sum_(_: int, __: int, values: list[int]) -> int:
+    return sum(values)

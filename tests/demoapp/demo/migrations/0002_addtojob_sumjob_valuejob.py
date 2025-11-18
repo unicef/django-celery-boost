@@ -78,7 +78,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name="SumAndAddToJob",
+            name="SumJob",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
                 ("version", concurrency.fields.AutoIncVersionField(default=0, help_text="record revision number")),
@@ -124,7 +124,6 @@ class Migration(migrations.Migration):
                         null=True,
                     ),
                 ),
-                ("value", models.IntegerField(default=0)),
                 (
                     "owner",
                     models.ForeignKey(
