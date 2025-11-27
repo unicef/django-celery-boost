@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import factory
-from demo.models import Job, MultipleJob
+from demo.models import Job, MultipleJob, AddToJob, SumJob, ValueJob
 from django.contrib.auth.models import Group, Permission, User
 from factory.django import DjangoModelFactory
 from factory.faker import Faker
@@ -82,3 +82,27 @@ class user_grant_permission:  # noqa
     def stop(self):
         """Stop an active patch."""
         return self.__exit__()
+
+
+class ValueJobFactory(DjangoModelFactory):
+    curr_async_result_id = None
+    last_async_result_id = None
+
+    class Meta:
+        model = ValueJob
+
+
+class AddToJobFactory(DjangoModelFactory):
+    curr_async_result_id = None
+    last_async_result_id = None
+
+    class Meta:
+        model = AddToJob
+
+
+class SumJobFactory(DjangoModelFactory):
+    curr_async_result_id = None
+    last_async_result_id = None
+
+    class Meta:
+        model = SumJob
