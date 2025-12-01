@@ -2,8 +2,8 @@
 title: Install
 ---
 
-django-celery-boost is a small Django Abstract Model that provides some useful methods to manage 
-Models that represents the "context" of a Celery task.  
+django-celery-boost is a small Django Abstract Model that provides some useful methods to manage
+Models that represents the "context" of a Celery task.
 
 
 !!! warning
@@ -18,7 +18,7 @@ Models that represents the "context" of a Celery task.
 ## Setup
 
 In your `settings.py`:
-    
+
     from <app>.config import env
 
     INSTALLED_APPS = [
@@ -26,8 +26,8 @@ In your `settings.py`:
         "admin_extra_buttons",
         "django_celery_boost",
     ]
-    
-    CELERY_BROKER_URL=redis:// 
+
+    CELERY_BROKER_URL=redis://
     CELERY_RESULT_BACKEND = CELERY_BROKER_URL
     CELERY_TASK_IGNORE_RESULT = False
     CELERY_TASK_DEFAULT_QUEUE = "my_tasks_queue"
@@ -47,25 +47,25 @@ In your `tasks.py`
         ...
 
 In your `models.py`
-    
-    
+
+
     class Job(CeleryTaskModel, models.Model):
         ...
-        
+
         celery_task_name = "demo.tasks.process_job"
 
-        # optional in csse 
-        celery_task_queue = ...  
+        # optional in csse
+        celery_task_queue = ...
         celery_task_revoked_queue = ...
 
 
 
-!!! warning 
+!!! warning
 
     Due to how Meta inheritance works in Django, you must use `class Meta(CeleryTaskModel.Meta)`
     in case tou need to customize your concrete class's Meta. Es:
 
-        
+
         class Meta(CeleryTaskModel.Meta):
             verbose_name = "Job"
 

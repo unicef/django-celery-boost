@@ -18,5 +18,5 @@
         show_signature: true
         show_signature_annotations: true
         show_symbol_type_heading: true
-        show_source: false  
+        show_source: false
         unwrap_annotated: false

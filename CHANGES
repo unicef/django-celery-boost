@@ -1,3 +1,7 @@
+0.6.1
+---
+* fix DisabledBackend object has no attribute _get_task_meta_for issue
+
 0.6
 ---
 * add AsyncJobModel
