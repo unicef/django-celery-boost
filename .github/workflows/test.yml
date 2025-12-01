@@ -62,7 +62,7 @@ jobs:
       max-parallel: 1
       matrix:
         python-version: [ "3.11", "3.12", "3.13" ]
-        django-version: [ "4.2", "5.1" ]
+        django-version: [ "4.2", "5.2" ]
       fail-fast: true
     needs: [ changes ]
     if: needs.changes.outputs.run_tests || needs.changes.outputs.lint
