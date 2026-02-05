@@ -542,6 +542,16 @@ class CeleryTaskModel(models.Model):
             conn.default_channel.client.delete(cls.celery_task_queue)
             conn.default_channel.client.delete(cls.celery_task_revoked_queue)
 
+    @classmethod
+    def get_current(cls) -> "CeleryTaskModel | None":
+        """Get the currently executing job by querying with Celery's task_id."""
+        from celery import current_task
+
+        if not current_task or not current_task.request.id:
+            return None
+
+        return cls.objects.filter(curr_async_result_id=current_task.request.id).first()
+
 
 class AsyncJobModel(CeleryTaskModel):
     class JobType(models.TextChoices):
