@@ -85,11 +85,11 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         return self._celery_terminate(request, pk)
 
     @button(
-        label="Graceful Cancel",
+        label="Cancel",
         permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o),
     )
-    def celery_graceful_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
-        return self._celery_graceful_cancel(request, pk)
+    def celery_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+        return self._celery_cancel(request, pk)
 
     def _celery_queue(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         obj: CeleryTaskModel | None
@@ -203,19 +203,17 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             ],
         )
 
-    def _celery_graceful_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+    def _celery_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         obj: CeleryTaskModel = self.get_object(request, pk)
 
         if obj.task_status != CeleryTaskModel.STARTED:
-            self.message_user(
-                request, "Graceful cancel is only available for running (STARTED) tasks.", messages.WARNING
-            )
+            self.message_user(request, "Cancel is only available for running (STARTED) tasks.", messages.WARNING)
             return None
 
-        ctx = self.get_common_context(request, pk, title=f"Confirm graceful cancel request for {obj}")
+        ctx = self.get_common_context(request, pk, title=f"Confirm cancel request for {obj}")
 
         def doit(request: "HttpRequest") -> HttpResponseRedirect:
-            result = obj.request_graceful_termination()
+            result = obj.request_cancellation()
             redirect_url = reverse(
                 "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
                 args=(obj.pk,),
@@ -243,7 +241,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             ],
         )
 
-    def tracking_display(self, obj: CeleryTaskModel) -> str:
+    def progress_info(self, obj: CeleryTaskModel) -> str:
         """Display tracking message for use in list_display.
 
         Args:
@@ -252,6 +250,6 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         Returns:
             The tracking message or "-" if not available
         """
-        return obj.tracking_message or "-"
+        return obj.progress or "-"
 
-    tracking_display.short_description = "Tracking"
+    progress_info.short_description = "Progress"
