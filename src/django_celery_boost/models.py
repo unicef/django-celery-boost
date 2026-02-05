@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import sentry_sdk
@@ -28,6 +29,9 @@ if TYPE_CHECKING:
     from kombu.transport.redis import Channel
 
 logger = logging.getLogger(__name__)
+
+CELERY_BOOST_TRACKING_TTL = getattr(settings, "CELERY_BOOST_TRACKING_TTL", 86400 * 2)
+CELERY_BOOST_TRACKING_KEY_PREFIX = getattr(settings, "CELERY_BOOST_TRACKING_KEY_PREFIX", "celery:task:tracking")
 
 
 APP_LABEL = "app_label"
@@ -402,6 +406,113 @@ class CeleryTaskModel(models.Model):
         self.save(update_fields=["local_status", "curr_async_result_id"])
         task_terminated.send(sender=self.__class__, task=self)
         return st
+
+    def _get_tracking_key(self) -> str:
+        """Return the Redis key for tracking data."""
+        return f"{CELERY_BOOST_TRACKING_KEY_PREFIX}:{self.curr_async_result_id}"
+
+    def set_tracking(self, message: str) -> None:
+        """Update tracking data in Redis hash.
+
+        Args:
+            message: Task-defined status text (e.g., "45% - Processing 450/1000")
+        """
+        if not self.curr_async_result_id:
+            return
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+            client.hset(key, "message", message)
+            client.expire(key, CELERY_BOOST_TRACKING_TTL)
+
+    def get_tracking(self, *keys: str) -> dict | None:
+        """Read tracking data from Redis hash.
+
+        Args:
+            *keys: Optional field names to retrieve. If none provided, returns all fields.
+
+        Returns:
+            Dictionary with tracking data or None if not found
+        """
+        if not self.curr_async_result_id:
+            return None
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+
+            if keys:
+                # Get specific fields using HMGET
+                values = client.hmget(key, *keys)
+                if not any(values):
+                    return None
+                data = dict(zip(keys, values))
+            else:
+                # Get all fields using HGETALL
+                data = client.hgetall(key)
+                if not data:
+                    return None
+
+            # Decode bytes to strings if needed (Redis returns bytes)
+            return {
+                (k.decode() if isinstance(k, bytes) else k): (v.decode() if isinstance(v, bytes) else v)
+                for k, v in data.items()
+                if v is not None
+            }
+
+    @property
+    def tracking(self) -> dict | None:
+        """Get tracking dict."""
+        return self.get_tracking()
+
+    @property
+    def tracking_message(self) -> str:
+        """Get tracking message for display."""
+        data = self.get_tracking("message")
+        return data.get("message", "") if data else ""
+
+    def clear_tracking(self) -> None:
+        """Remove tracking data from Redis."""
+        if not self.curr_async_result_id:
+            return
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+            client.delete(key)
+
+    def request_graceful_termination(self) -> bool:
+        """Set terminate_requested flag in Redis.
+
+        Returns:
+            True if the flag was set, False if no task is running
+        """
+        if not self.curr_async_result_id:
+            return False
+
+        mapping = {
+            "terminate_requested": "1",
+            "terminate_requested_at": datetime.utcnow().isoformat(),
+        }
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+            client.hset(key, mapping=mapping)
+            client.expire(key, CELERY_BOOST_TRACKING_TTL)
+        return True
+
+    def is_termination_requested(self) -> bool:
+        """Check if termination was requested.
+
+        Returns:
+            True if termination was requested, False otherwise
+        """
+        data = self.get_tracking("terminate_requested")
+        if data:
+            return data.get("terminate_requested") == "1"
+        return False
 
     def signature(self) -> Signature:
         if not isinstance(self.task_handler, TaskRunFromSignature):

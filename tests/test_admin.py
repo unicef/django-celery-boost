@@ -108,3 +108,58 @@ def test_check_status(request, django_app, std_user, job, queued):
     url = reverse("admin:demo_job_check_status")
     res = django_app.get(url, user=std_user)
     assert res.status_code == 302
+
+
+def test_celery_graceful_cancel_permission(django_app, std_user, job):
+    """Test graceful cancel requires terminate permission."""
+    url = reverse("admin:demo_job_celery_graceful_cancel", args=[job.pk])
+    res = django_app.get(url, user=std_user, expect_errors=True)
+    assert res.status_code == 403
+
+
+def test_celery_graceful_cancel_not_started(django_app, std_user, job):
+    """Test graceful cancel only works for STARTED tasks."""
+    url = reverse("admin:demo_job_celery_graceful_cancel", args=[job.pk])
+
+    with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
+        res = django_app.get(url, user=std_user).follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Graceful cancel is only available for running (STARTED) tasks."]
+
+        job.queue()
+        res = django_app.get(url, user=std_user).follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Graceful cancel is only available for running (STARTED) tasks."]
+
+
+def test_celery_graceful_cancel_started(django_app, std_user, job):
+    """Test graceful cancel works for STARTED tasks."""
+    url = reverse("admin:demo_job_celery_graceful_cancel", args=[job.pk])
+    job.queue()
+
+    with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
+        with mock.patch.object(Job, "task_status", Job.STARTED):
+            res = django_app.get(url, user=std_user)
+            assert res.status_code == 200
+
+            res = res.forms[1].submit().follow()
+            msgs = res.context["messages"]
+            assert [m.message for m in msgs] == ["Graceful termination requested."]
+
+            job.refresh_from_db()
+            assert job.is_termination_requested() is True
+
+
+def test_tracking_display(db):
+    """Test tracking_display admin method."""
+    from demo.factories import JobFactory
+    from django_celery_boost.admin import CeleryTaskModelAdmin
+
+    admin = CeleryTaskModelAdmin(Job, None)
+    job = JobFactory()
+
+    assert admin.tracking_display(job) == "-"
+
+    job.queue()
+    job.set_tracking("75% complete")
+    assert admin.tracking_display(job) == "75% complete"

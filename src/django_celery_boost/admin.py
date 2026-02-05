@@ -84,6 +84,13 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     def celery_terminate(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         return self._celery_terminate(request, pk)
 
+    @button(
+        label="Graceful Cancel",
+        permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o),
+    )
+    def celery_graceful_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+        return self._celery_graceful_cancel(request, pk)
+
     def _celery_queue(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         obj: CeleryTaskModel | None
         obj = self.get_object(request, pk)
@@ -195,3 +202,56 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 "%s/celery_boost/terminate.html" % self.admin_site.name,
             ],
         )
+
+    def _celery_graceful_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+        obj: CeleryTaskModel = self.get_object(request, pk)
+
+        if obj.task_status != CeleryTaskModel.STARTED:
+            self.message_user(
+                request, "Graceful cancel is only available for running (STARTED) tasks.", messages.WARNING
+            )
+            return None
+
+        ctx = self.get_common_context(request, pk, title=f"Confirm graceful cancel request for {obj}")
+
+        def doit(request: "HttpRequest") -> HttpResponseRedirect:
+            result = obj.request_graceful_termination()
+            redirect_url = reverse(
+                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
+                args=(obj.pk,),
+                current_app=self.admin_site.name,
+            )
+            if result:
+                self.message_user(request, "Graceful termination requested.", messages.SUCCESS)
+            else:
+                self.message_user(request, "Could not request graceful termination.", messages.ERROR)
+            return HttpResponseRedirect(redirect_url)
+
+        return confirm_action(
+            self,
+            request,
+            doit,
+            message="Do you really want to request graceful cancellation of this task?",
+            success_message=None,
+            extra_context=ctx,
+            description="The task will be notified to stop at the next checkpoint.",
+            template=self.terminate_template
+            or [
+                "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label),
+                "%s/celery_boost/terminate.html" % self.admin_site.name,
+            ],
+        )
+
+    def tracking_display(self, obj: CeleryTaskModel) -> str:
+        """Display tracking message for use in list_display.
+
+        Args:
+            obj: The CeleryTaskModel instance
+
+        Returns:
+            The tracking message or "-" if not available
+        """
+        return obj.tracking_message or "-"
+
+    tracking_display.short_description = "Tracking"
