@@ -411,10 +411,11 @@ class CeleryTaskModel(models.Model):
         return f"{CELERY_BOOST_TRACKING_KEY_PREFIX}:{self.curr_async_result_id}"
 
     def set_tracking_info(self, field: str, value: str) -> None:
-        """Update tracking data in Redis hash.
+        """Set a field in the tracking Redis hash.
 
         Args:
-            message: Task-defined status text (e.g., "45% - Processing 450/1000")
+            field: The field name to set
+            value: The value to store
         """
         if not self.curr_async_result_id:
             return
@@ -426,19 +427,21 @@ class CeleryTaskModel(models.Model):
             client.expire(key, CELERY_BOOST_TRACKING_TTL)
 
     def set_total(self, value: str | int) -> None:
+        """Set the total count for progress tracking."""
         self.set_tracking_info("total", str(value))
 
     def set_progress(self, value: str | int) -> None:
+        """Set the current progress count for progress tracking."""
         self.set_tracking_info("progress", str(value))
 
     def get_tracking_info(self, *fields: str) -> dict | None:
         """Read tracking data from Redis hash.
 
         Args:
-            *keys: Optional field names to retrieve. If none provided, returns all fields.
+            *fields: Optional field names to retrieve. If none provided, returns all fields.
 
         Returns:
-            Dictionary with tracking data or None if not found
+            Dictionary with tracking data or None if not found.
         """
         if not self.curr_async_result_id:
             return None
@@ -473,7 +476,7 @@ class CeleryTaskModel(models.Model):
 
     @property
     def progress(self) -> str:
-        """Get progress message for display."""
+        """Get progress as 'current/total' string for display."""
         data = self.get_tracking_info("total", "progress")
         if data:
             progress = data.get("progress", "Unknown")
@@ -492,10 +495,13 @@ class CeleryTaskModel(models.Model):
             client.delete(key)
 
     def request_cancellation(self) -> bool:
-        """Set terminate_requested flag in Redis.
+        """Request cooperative cancellation of a running task.
+
+        Sets a flag in Redis that the task can check via `is_termination_requested`.
+        The task must cooperatively check this flag and stop execution.
 
         Returns:
-            True if the flag was set, False if no task is running
+            True if the flag was set, False if no task is running.
         """
         if not self.curr_async_result_id:
             return False
@@ -505,10 +511,10 @@ class CeleryTaskModel(models.Model):
 
     @property
     def is_termination_requested(self) -> bool:
-        """Check if termination was requested.
+        """Check if cancellation was requested via `request_cancellation()`.
 
         Returns:
-            True if termination was requested, False otherwise
+            True if cancellation was requested, False otherwise.
         """
         data = self.get_tracking_info("terminate_requested")
         if data:
@@ -554,6 +560,11 @@ class CeleryTaskModel(models.Model):
         return cls.objects.filter(curr_async_result_id=current_task.request.id).first()
 
     def cancel(self) -> None:
+        """Mark the task as cancelled and clean up tracking data.
+
+        Call this from within the task when stopping due to cancellation request.
+        Only works when task status is STARTED. Sends `task_canceled` signal.
+        """
         if self.task_status == self.STARTED:
             self.local_status = self.CANCELED
             self.save(update_fields=["local_status"])

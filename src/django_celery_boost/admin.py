@@ -242,13 +242,13 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
         )
 
     def progress_info(self, obj: CeleryTaskModel) -> str:
-        """Display tracking message for use in list_display.
+        """Display progress info for use in list_display.
 
         Args:
             obj: The CeleryTaskModel instance
 
         Returns:
-            The tracking message or "-" if not available
+            Progress as 'current/total' or 'Unknown' if not available.
         """
         return obj.progress or "-"
 
