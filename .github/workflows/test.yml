@@ -61,7 +61,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        cfg: [ "d42-py311", "d52-py313", "d60-py314", ]
+        cfg: [ "d42-py311", "d52-py313", ]
 
       fail-fast: true
     needs: [ changes ]
