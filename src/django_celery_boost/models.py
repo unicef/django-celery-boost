@@ -18,7 +18,7 @@ from django.utils.functional import classproperty
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext as _
 
-from django_celery_boost.signals import task_queued, task_revoked, task_terminated
+from django_celery_boost.signals import task_queued, task_revoked, task_terminated, task_canceled
 from django_celery_boost.task import TaskRunFromSignature
 
 if TYPE_CHECKING:
@@ -28,6 +28,9 @@ if TYPE_CHECKING:
     from kombu.transport.redis import Channel
 
 logger = logging.getLogger(__name__)
+
+CELERY_BOOST_TRACKING_TTL = getattr(settings, "CELERY_BOOST_TRACKING_TTL", 86400 * 2)
+CELERY_BOOST_TRACKING_KEY_PREFIX = getattr(settings, "CELERY_BOOST_TRACKING_KEY_PREFIX", "celery:task:tracking")
 
 
 APP_LABEL = "app_label"
@@ -367,7 +370,7 @@ class CeleryTaskModel(models.Model):
 
     def revoke(self, wait=False, timeout=None) -> None:
         if self.async_result:
-            self.async_result.revoke(terminate=False, signal="SIGTERM", wait=wait, timeout=timeout)
+            self.async_result.revoke(wait=wait, timeout=timeout)
         task_revoked.send(sender=self.__class__, task=self)
 
     def terminate(self, wait=False, timeout=None) -> str:
@@ -403,6 +406,121 @@ class CeleryTaskModel(models.Model):
         task_terminated.send(sender=self.__class__, task=self)
         return st
 
+    def _get_tracking_key(self) -> str:
+        """Return the Redis key for tracking data."""
+        return f"{CELERY_BOOST_TRACKING_KEY_PREFIX}:{self.curr_async_result_id}"
+
+    def set_tracking_info(self, field: str, value: str) -> None:
+        """Set a field in the tracking Redis hash.
+
+        Args:
+            field: The field name to set
+            value: The value to store
+        """
+        if not self.curr_async_result_id:
+            return
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+            client.hset(key, field, value)
+            client.expire(key, CELERY_BOOST_TRACKING_TTL)
+
+    def set_total(self, value: str | int) -> None:
+        """Set the total count for progress tracking."""
+        self.set_tracking_info("total", str(value))
+
+    def set_progress(self, value: str | int) -> None:
+        """Set the current progress count for progress tracking."""
+        self.set_tracking_info("progress", str(value))
+
+    def get_tracking_info(self, *fields: str) -> dict | None:
+        """Read tracking data from Redis hash.
+
+        Args:
+            *fields: Optional field names to retrieve. If none provided, returns all fields.
+
+        Returns:
+            Dictionary with tracking data or None if not found.
+        """
+        if not self.curr_async_result_id:
+            return None
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+
+            if fields:
+                # Get specific fields using HMGET
+                values = client.hmget(key, *fields)
+                if not any(values):
+                    return None
+                data = dict(zip(fields, values))
+            else:
+                # Get all fields using HGETALL
+                data = client.hgetall(key)
+                if not data:
+                    return None
+
+            # Decode bytes to strings if needed (Redis returns bytes)
+            return {
+                (k.decode() if isinstance(k, bytes) else k): (v.decode() if isinstance(v, bytes) else v)
+                for k, v in data.items()
+                if v is not None
+            }
+
+    @property
+    def tracking_info(self) -> dict | None:
+        """Get tracking dict."""
+        return self.get_tracking_info()
+
+    @property
+    def progress(self) -> str:
+        """Get progress as 'current/total' string for display."""
+        data = self.get_tracking_info("total", "progress")
+        if data:
+            progress = data.get("progress", "Unknown")
+            total = data.get("total", "Unknown")
+            return f"{progress}/{total}"
+        return "Unknown"
+
+    def clear_tracking_info(self) -> None:
+        """Remove tracking data from Redis."""
+        if not self.curr_async_result_id:
+            return
+
+        with self.celery_app.pool.acquire(block=True) as conn:
+            client = conn.default_channel.client
+            key = self._get_tracking_key()
+            client.delete(key)
+
+    def request_cancellation(self) -> bool:
+        """Request cooperative cancellation of a running task.
+
+        Sets a flag in Redis that the task can check via `is_termination_requested`.
+        The task must cooperatively check this flag and stop execution.
+
+        Returns:
+            True if the flag was set, False if no task is running.
+        """
+        if not self.curr_async_result_id:
+            return False
+
+        self.set_tracking_info("terminate_requested", "1")
+        return True
+
+    @property
+    def is_termination_requested(self) -> bool:
+        """Check if cancellation was requested via `request_cancellation()`.
+
+        Returns:
+            True if cancellation was requested, False otherwise.
+        """
+        data = self.get_tracking_info("terminate_requested")
+        if data:
+            return data.get("terminate_requested") == "1"
+        return False
+
     def signature(self) -> Signature:
         if not isinstance(self.task_handler, TaskRunFromSignature):
             raise InvalidTaskBase(self.celery_task_name)
@@ -430,6 +548,28 @@ class CeleryTaskModel(models.Model):
         with cls.celery_app.pool.acquire(block=True) as conn:
             conn.default_channel.client.delete(cls.celery_task_queue)
             conn.default_channel.client.delete(cls.celery_task_revoked_queue)
+
+    @classmethod
+    def get_current(cls) -> "CeleryTaskModel | None":
+        """Get the currently executing job by querying with Celery's task_id."""
+        from celery import current_task
+
+        if not current_task or not current_task.request.id:
+            return None
+
+        return cls.objects.filter(curr_async_result_id=current_task.request.id).first()
+
+    def cancel(self) -> None:
+        """Mark the task as cancelled and clean up tracking data.
+
+        Call this from within the task when stopping due to cancellation request.
+        Only works when task status is STARTED. Sends `task_canceled` signal.
+        """
+        if self.task_status == self.STARTED:
+            self.local_status = self.CANCELED
+            self.save(update_fields=["local_status"])
+            self.clear_tracking_info()
+            task_canceled.send(sender=self.__class__, task=self)
 
 
 class AsyncJobModel(CeleryTaskModel):

@@ -4,6 +4,7 @@ from django.dispatch import Signal
 task_queued = Signal()
 task_revoked = Signal()
 task_terminated = Signal()
+task_canceled = Signal()
 
 # events
 task_complete = Signal()
