@@ -1,5 +1,19 @@
-0.6.1
+0.8
 ---
+* graceful cancelation and progress tracking
+
+0.7
+---
+* Fix AsyncResult with Celery app
+* Add canvas support
+
+
+0.6.2
+-----
+* Create AsyncResult with Celery app
+
+0.6.1
+-----
 * fix DisabledBackend object has no attribute _get_task_meta_for issue
 
 0.6
