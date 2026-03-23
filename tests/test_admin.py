@@ -108,3 +108,73 @@ def test_check_status(request, django_app, std_user, job, queued):
     url = reverse("admin:demo_job_check_status")
     res = django_app.get(url, user=std_user)
     assert res.status_code == 302
+
+
+def test_celery_cancel_permission(django_app, std_user, job):
+    """Test cancel requires terminate permission."""
+    url = reverse("admin:demo_job_celery_cancel", args=[job.pk])
+    res = django_app.get(url, user=std_user, expect_errors=True)
+    assert res.status_code == 403
+
+
+def test_celery_cancel_not_started(django_app, std_user, job):
+    """Test cancel only works for STARTED tasks."""
+    url = reverse("admin:demo_job_celery_cancel", args=[job.pk])
+
+    with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
+        res = django_app.get(url, user=std_user).follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Cancel is only available for running (STARTED) tasks."]
+
+        job.queue()
+        res = django_app.get(url, user=std_user).follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Cancel is only available for running (STARTED) tasks."]
+
+
+def test_celery_cancel_started(django_app, std_user, job):
+    """Test cancel works for STARTED tasks."""
+    url = reverse("admin:demo_job_celery_cancel", args=[job.pk])
+    job.queue()
+
+    with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
+        with mock.patch.object(Job, "task_status", Job.STARTED):
+            res = django_app.get(url, user=std_user)
+            assert res.status_code == 200
+
+            res = res.forms[1].submit().follow()
+            msgs = res.context["messages"]
+            assert [m.message for m in msgs] == ["Graceful termination requested."]
+
+            job.refresh_from_db()
+            assert job.is_termination_requested is True
+
+
+def test_celery_cancel_failure(django_app, std_user, job):
+    """Test cancel shows error when request_cancellation fails."""
+    url = reverse("admin:demo_job_celery_cancel", args=[job.pk])
+    job.queue()
+
+    with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
+        with mock.patch.object(Job, "task_status", Job.STARTED):
+            with mock.patch.object(Job, "request_cancellation", return_value=False):
+                res = django_app.get(url, user=std_user)
+                res = res.forms[1].submit().follow()
+                msgs = res.context["messages"]
+                assert [m.message for m in msgs] == ["Could not request graceful termination."]
+
+
+def test_progress_info(db):
+    """Test progress_info admin method."""
+    from demo.factories import JobFactory
+    from django_celery_boost.admin import CeleryTaskModelAdmin
+
+    admin = CeleryTaskModelAdmin(Job, None)
+    job = JobFactory()
+
+    assert admin.progress_info(job) == "Unknown"
+
+    job.queue()
+    job.set_total(100)
+    job.set_progress(75)
+    assert admin.progress_info(job) == "75/100"
