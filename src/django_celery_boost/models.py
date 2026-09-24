@@ -18,13 +18,7 @@ from django.utils.functional import classproperty
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext as _
 
-from django_celery_boost.signals import (
-    task_canceled,
-    task_queued,
-    task_reset,
-    task_revoked,
-    task_terminated,
-)
+from django_celery_boost.signals import task_queued, task_revoked, task_terminated, task_canceled
 from django_celery_boost.task import TaskRunFromSignature
 
 if TYPE_CHECKING:
@@ -374,10 +368,44 @@ class CeleryTaskModel(models.Model):
             return self.curr_async_result_id
         return None
 
-    def revoke(self, wait=False, timeout=None) -> None:
-        if self.async_result:
-            self.async_result.revoke(wait=wait, timeout=timeout)
+    def revoke(self, wait=False, timeout=None) -> str:
+        """Revoke the task and detach its AsyncResult.
+
+        Broadcasts a soft Celery revoke (a live worker discards the task if it
+        has not started it) and clears the local AsyncResult, status and tracking
+        data. ``task_status`` returns ``NOT_SCHEDULED`` afterwards, so the task
+        can be queued again. This is also how a task left ``STARTED`` after a
+        worker loss is recovered.
+
+        Unlike :meth:`terminate`, it does not kill a task that is already running
+        (no ``terminate=True``).
+
+        Returns:
+            The resulting task status (``NOT_SCHEDULED``).
+        """
+        result = self.async_result
+        old_id = result.id if result else self.curr_async_result_id
+        if result is not None:
+            result.revoke(wait=wait, timeout=timeout)
+            try:
+                result.forget()
+            except Exception as e:  # noqa
+                logger.exception(e)
+        self.clear_tracking_info()
+        self.last_async_result_id = old_id
+        self.curr_async_result_id = None
+        self.local_status = self.REVOKED
+        self.datetime_queued = None
+        self.save(
+            update_fields=[
+                "last_async_result_id",
+                "curr_async_result_id",
+                "local_status",
+                "datetime_queued",
+            ]
+        )
         task_revoked.send(sender=self.__class__, task=self)
+        return self.task_status
 
     def terminate(self, wait=False, timeout=None) -> str:
         """Revoke the task. Does not need Running workers."""
@@ -412,43 +440,6 @@ class CeleryTaskModel(models.Model):
         self.save(update_fields=["local_status", "curr_async_result_id"])
         task_terminated.send(sender=self.__class__, task=self)
         return st
-
-    def reset(self) -> str:
-        """Detach a stale AsyncResult so the task can be queued again.
-
-        Intended to recover tasks left in an active state (e.g. ``STARTED``)
-        after the worker running them was lost. It clears ``curr_async_result_id``
-        and the local status, and forgets the stored result, so ``task_status``
-        returns ``NOT_SCHEDULED`` and :meth:`queue` can schedule the task again.
-
-        This does not stop a task that is still running; make sure the task is no
-        longer active (or accept that its AsyncResult is detached) before calling.
-
-        Returns:
-            The resulting task status (``NOT_SCHEDULED``).
-        """
-        result = self.async_result
-        old_id = result.id if result else self.curr_async_result_id
-        self.clear_tracking_info()
-        if result is not None:
-            try:
-                result.forget()
-            except Exception as e:  # noqa
-                logger.exception(e)
-        self.last_async_result_id = old_id
-        self.curr_async_result_id = None
-        self.local_status = ""
-        self.datetime_queued = None
-        self.save(
-            update_fields=[
-                "last_async_result_id",
-                "curr_async_result_id",
-                "local_status",
-                "datetime_queued",
-            ]
-        )
-        task_reset.send(sender=self.__class__, task=self)
-        return self.task_status
 
     def _get_tracking_key(self) -> str:
         """Return the Redis key for tracking data."""

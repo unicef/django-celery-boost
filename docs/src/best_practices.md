@@ -14,11 +14,10 @@ interchangeable:
 
 | Action | What it does | Stops a running task? |
 | --- | --- | --- |
-| `revoke()` | Broadcasts a Celery revoke so a worker that has not started the task discards it. | No |
-| `terminate()` | Removes a queued task from Redis, or sends a `SIGKILL`-terminate revoke to a running task. | Yes |
+| `revoke()` | Broadcasts a soft Celery revoke and detaches the AsyncResult (`curr_async_result_id` cleared) so the record can be queued again. | No |
+| `terminate()` | Removes a queued task from Redis, or sends a `SIGKILL`-terminate revoke to a running task, then detaches. | Yes |
 | `request_cancellation()` | Sets a Redis flag the task must poll via `is_termination_requested`; the task then calls `cancel()` itself. | Cooperative |
 | `cancel()` | Called *inside* the task to acknowledge a cancellation request (`local_status = CANCELED`). | N/A |
-| `reset()` | Recovery only: detaches a stale result (e.g. `STARTED` after worker loss) so the task can be queued again. | No |
 
 See [Concurrency and locks](concurrency.md#recovering-a-stuck-task) for the
 worker-loss recovery recipe.

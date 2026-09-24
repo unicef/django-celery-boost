@@ -1,7 +1,8 @@
 Unreleased
 ----------
-* add `CeleryTaskModel.reset()` and admin "Reset" action to recover tasks stuck in an active state after worker loss
-* `terminate()` now clears `curr_async_result_id` for running (STARTED) tasks
+* Breaking: `revoke()` now clears `curr_async_result_id` and detaches the AsyncResult (returning `NOT_SCHEDULED`) after broadcasting the revoke, so a task stuck in `STARTED` after worker loss can be queued again
+* Admin Revoke and Terminate actions are no longer limited to tasks present in the Redis queue; they are available for any scheduled task
+* add Django 6.0 to the test matrix
 
 0.6.1
 ---

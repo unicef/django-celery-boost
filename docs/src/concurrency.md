@@ -35,14 +35,16 @@ task](#recovering-a-stuck-task).
 
 If a worker is lost while a task is `STARTED`, the result backend keeps reporting
 `STARTED` forever. `queue()` refuses to run active tasks, so the record is stuck.
-Use `reset()` to detach the stale result:
+Call `revoke()` to broadcast the cancellation and detach the stale result, then
+queue it again:
 
-    job.reset()   # clears curr_async_result_id, local_status and tracking
-    job.queue()   # now it can be scheduled again
+    job.revoke()   # clears curr_async_result_id, local_status and tracking
+    job.queue()    # now it can be scheduled again
 
-`reset()` does not stop a running task. Only call it once the task is no longer
-running (for example after a worker crash), or accept that its `AsyncResult` is
-detached. The admin exposes the same operation as the **Reset** button.
+`revoke()` is a *soft* cancel: it tells a live worker to discard a task it has not
+started yet, but it does **not** kill a task that is already running. Use
+`terminate()` for a hard stop. The same actions are exposed in the admin as the
+**Revoke** and **Terminate** buttons.
 
 ## When you do need a lock
 

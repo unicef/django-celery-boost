@@ -76,20 +76,25 @@ To "run" your task:
     j = Job.objecs.get(pk=1)
     j.queue()
 
-To stop a queued or running task:
+To cancel a task (soft revoke):
+
+    j.revoke()
+
+To stop a queued or running task (hard):
 
     j.terminate()
 
 ## Recover a task stuck after worker loss
 
 If a worker dies while a task is `STARTED`, the result stays `STARTED` and the
-task can no longer be queued. Use `reset()` to detach the stale result, then
+task can no longer be queued. Use `revoke()` to detach the stale result, then
 queue it again:
 
-    j.reset()
+    j.revoke()
     j.queue()
 
-`reset()` clears `curr_async_result_id` and the local status (returning the task
-to `Not scheduled`) and forgets the stored result. It does **not** stop a task
-that is still running. In the admin the same operation is available as the
-**Reset** button. See [Concurrency and locks](concurrency.md) for details.
+`revoke()` broadcasts a soft Celery revoke, clears `curr_async_result_id` and the
+local status (returning the task to `Not scheduled`) and forgets the stored
+result. It does **not** kill a task that is still running; use `terminate()` for a
+hard stop. In the admin these are the **Revoke** and **Terminate** buttons. See
+[Concurrency and locks](concurrency.md) for details.

@@ -139,11 +139,17 @@ def test_model_task_info(db):
 def test_revoke(db):
     job1: Job = JobFactory()
 
-    job1.revoke()
+    assert job1.revoke() == Job.NOT_SCHEDULED
 
     job1.queue()
-    job1.revoke()
-    assert job1.task_status == Job.QUEUED
+    old_id = job1.curr_async_result_id
+    assert job1.revoke() == Job.NOT_SCHEDULED
+    job1.refresh_from_db()
+    assert job1.curr_async_result_id is None
+    assert job1.last_async_result_id == old_id
+    assert job1.local_status == Job.REVOKED
+    assert job1.task_status == Job.NOT_SCHEDULED
+    assert job1.queue() is not None
 
 
 def test_terminate(db):
@@ -172,10 +178,8 @@ def test_terminate(db):
             assert job1.terminate() == job1.CANCELED
 
 
-def test_reset_recovers_stale_started(db):
+def test_revoke_recovers_stale_started(db):
     job1: Job = JobFactory()
-    assert job1.reset() == Job.NOT_SCHEDULED
-
     job1.queue()
     old_id = job1.curr_async_result_id
     assert old_id
@@ -183,16 +187,16 @@ def test_reset_recovers_stale_started(db):
     with mock.patch("demo.models.Job.task_status", new_callable=PropertyMock) as m:
         m.return_value = Job.STARTED
         assert job1.queue() is None
-        job1.reset()
+        job1.revoke()
     job1.refresh_from_db()
     assert job1.curr_async_result_id is None
     assert job1.last_async_result_id == old_id
-    assert job1.local_status == ""
+    assert job1.local_status == Job.REVOKED
     assert job1.task_status == Job.NOT_SCHEDULED
     assert job1.queue() is not None
 
 
-def test_reset_clears_tracking(db):
+def test_revoke_clears_tracking(db):
     job1: Job = JobFactory()
     job1.queue()
     job1.set_total(100)
@@ -200,20 +204,20 @@ def test_reset_clears_tracking(db):
     key = job1._get_tracking_key()
     assert job1.get_tracking_info() is not None
 
-    job1.reset()
+    job1.revoke()
 
     with job1.celery_app.pool.acquire(block=True) as conn:
         assert conn.default_channel.client.exists(key) == 0
     assert job1.curr_async_result_id is None
 
 
-def test_reset_forgets_result(db):
+def test_revoke_forgets_result(db):
     job1: Job = JobFactory()
     job1.queue()
     result = mock.MagicMock()
     result.id = job1.curr_async_result_id
     with mock.patch.object(Job, "async_result", result):
-        job1.reset()
+        job1.revoke()
     result.forget.assert_called_once()
 
 
