@@ -33,7 +33,40 @@ In your `settings.py`:
     CELERY_TASK_DEFAULT_QUEUE = "my_tasks_queue"
     CELERY_TASK_REVOKED_QUEUE = "my_revoked_queue"
 
-    CELERY_BOOST_FLOWER = "<your flower address if available>"
+    CELERY_BOOST_FLOWER = "/flower"  # optional, this is the default
+
+## Flower links
+
+When a task has a result id, `django-celery-boost` renders a **Flower** button
+pointing to `<address>/task/<id>`. The address is resolved, in order, from:
+
+1. `CELERY_BOOST_FLOWER` (canonical setting)
+2. `CELERY_FLOW_ADDRESS` (deprecated alias, will be removed)
+3. `/flower` (default)
+
+A relative value is made absolute against the current request, so the link
+automatically follows the host and scheme the admin is served from. Set an
+absolute value only when Flower is hosted elsewhere:
+
+    CELERY_BOOST_FLOWER = "https://flower.example.org"
+
+To make the link available on **every** admin template (including the change
+form), register the bundled context processor:
+
+    TEMPLATES = [
+        {
+            ...
+            "OPTIONS": {
+                "context_processors": [
+                    ...
+                    "django_celery_boost.context_processors.flower",
+                ],
+            },
+        },
+    ]
+
+It exposes `{{ flower_addr }}` to templates. The action pages (inspect, queue,
+terminate) provide it out of the box.
 
 ## Use in your code
 

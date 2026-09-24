@@ -4,7 +4,6 @@ from typing import Any, Sequence
 
 from admin_extra_buttons.decorators import button
 from admin_extra_buttons.mixins import ExtraButtonsMixin, confirm_action
-from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
@@ -13,6 +12,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from django_celery_boost.models import CeleryTaskModel
+from django_celery_boost.utils import get_flower_address
 
 
 class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
@@ -38,7 +38,7 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
                 obj.save()
 
     def get_common_context(self, request: HttpRequest, pk: str = None, **kwargs: Any) -> dict[str, Any]:
-        kwargs["flower_addr"] = getattr(settings, "CELERY_FLOW_ADDRESS", "")
+        kwargs["flower_addr"] = get_flower_address(request)
         return super().get_common_context(request, pk, **kwargs)
 
     @button(permission=lambda r, o, handler: handler.model_admin.has_queue_permission("inspect", r, o))
