@@ -16,6 +16,8 @@ Models that represents the "context" of a Celery task.
 - Easy control Django Model records to celery task
 - Business View of Celery Task
 - Revoke tasks with to running workers
+- Recover tasks stuck in an active state after worker loss
+- Optimistic concurrency control between the record and the task
 - Retrieve task position in the queue
 - Admin integration to inspect task status (running/result/error)
 

@@ -1,3 +1,8 @@
+Unreleased
+----------
+* add `CeleryTaskModel.reset()` and admin "Reset" action to recover tasks stuck in an active state after worker loss
+* `terminate()` now clears `curr_async_result_id` for running (STARTED) tasks
+
 0.6.1
 ---
 * fix DisabledBackend object has no attribute _get_task_meta_for issue

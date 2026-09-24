@@ -164,6 +164,26 @@ def test_celery_cancel_failure(django_app, std_user, job):
                 assert [m.message for m in msgs] == ["Could not request graceful termination."]
 
 
+def test_celery_reset(django_app, std_user, job):
+    url = reverse("admin:demo_job_celery_reset", args=[job.pk])
+    res = django_app.get(url, user=std_user, expect_errors=True)
+    assert res.status_code == 403
+
+    with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
+        res = django_app.get(url, user=std_user).follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Task is not scheduled."]
+
+        job.queue()
+        res = django_app.get(url, user=std_user)
+        assert res.status_code == 200
+        res = res.forms[1].submit().follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Task reset."]
+        job.refresh_from_db()
+        assert job.curr_async_result_id is None
+
+
 def test_progress_info(db):
     """Test progress_info admin method."""
     from demo.factories import JobFactory

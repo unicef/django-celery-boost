@@ -91,6 +91,13 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
     def celery_cancel(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         return self._celery_cancel(request, pk)
 
+    @button(
+        label="Reset",
+        permission=lambda r, o, handler: handler.model_admin.has_queue_permission("terminate", r, o),
+    )
+    def celery_reset(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+        return self._celery_reset(request, pk)
+
     def _celery_queue(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
         obj: CeleryTaskModel | None
         obj = self.get_object(request, pk)
@@ -233,6 +240,44 @@ class CeleryTaskModelAdmin(ExtraButtonsMixin, admin.ModelAdmin):
             success_message=None,
             extra_context=ctx,
             description="The task will be notified to stop at the next checkpoint.",
+            template=self.terminate_template
+            or [
+                "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),
+                "%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label),
+                "%s/celery_boost/terminate.html" % self.admin_site.name,
+            ],
+        )
+
+    def _celery_reset(self, request: "HttpRequest", pk: str) -> "HttpResponse":  # type: ignore
+        obj: CeleryTaskModel = self.get_object(request, pk)
+
+        if not obj.curr_async_result_id:
+            self.message_user(request, "Task is not scheduled.", messages.WARNING)
+            return None
+        if obj.is_terminated():
+            self.message_user(request, "Task is already terminated.", messages.WARNING)
+            return None
+
+        ctx = self.get_common_context(request, pk, title=f"Confirm reset action for {obj}")
+
+        def doit(request: "HttpRequest") -> HttpResponseRedirect:
+            obj.reset()
+            redirect_url = reverse(
+                "%s:%s_%s_change" % (self.admin_site.name, obj._meta.app_label, obj._meta.model_name),
+                args=(obj.pk,),
+                current_app=self.admin_site.name,
+            )
+            self.message_user(request, "Task reset.", messages.SUCCESS)
+            return HttpResponseRedirect(redirect_url)
+
+        return confirm_action(
+            self,
+            request,
+            doit,
+            message="Do you really want to reset this task?",
+            success_message=None,
+            extra_context=ctx,
+            description="The stale AsyncResult will be detached and the task can be queued again.",
             template=self.terminate_template
             or [
                 "%s/%s/%s/terminate.html" % (self.admin_site.name, self.opts.app_label, self.opts.model_name),

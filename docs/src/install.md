@@ -76,6 +76,20 @@ To "run" your task:
     j = Job.objecs.get(pk=1)
     j.queue()
 
-To "cancel" it:
+To stop a queued or running task:
 
     j.terminate()
+
+## Recover a task stuck after worker loss
+
+If a worker dies while a task is `STARTED`, the result stays `STARTED` and the
+task can no longer be queued. Use `reset()` to detach the stale result, then
+queue it again:
+
+    j.reset()
+    j.queue()
+
+`reset()` clears `curr_async_result_id` and the local status (returning the task
+to `Not scheduled`) and forgets the stored result. It does **not** stop a task
+that is still running. In the admin the same operation is available as the
+**Reset** button. See [Concurrency and locks](concurrency.md) for details.
