@@ -77,12 +77,15 @@ def test_celery_terminate(request, django_app, std_user, job):
     with user_grant_permission(std_user, ["demo.terminate_job", "demo.change_job"]):
         res = django_app.get(url, user=std_user).follow()
         msgs = res.context["messages"]
-        assert [m.message for m in msgs] == ["Task not queued."]
-        with mock.patch.object(Job, "is_queued", lambda s: True):
-            res = django_app.get(url, user=std_user)
-            res = res.forms[1].submit().follow()
-            msgs = res.context["messages"]
-            assert [m.message for m in msgs] == ["UNKNOWN"]
+        assert [m.message for m in msgs] == ["Task is not scheduled."]
+
+        job.queue()
+        res = django_app.get(url, user=std_user)
+        res = res.forms[1].submit().follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["CANCELED"]
+        job.refresh_from_db()
+        assert job.curr_async_result_id is None
 
 
 def test_celery_revoke(request, django_app, std_user, job):
@@ -90,18 +93,18 @@ def test_celery_revoke(request, django_app, std_user, job):
     res = django_app.get(url, user=std_user, expect_errors=True)
     assert res.status_code == 403
 
-    with mock.patch.object(job, "is_queued", lambda: True):
-        with user_grant_permission(std_user, ["demo.revoke_job", "demo.change_job"]):
-            res = django_app.get(url, user=std_user).follow()
-            msgs = res.context["messages"]
-            assert [m.message for m in msgs] == ["Task not queued."]
+    with user_grant_permission(std_user, ["demo.revoke_job", "demo.change_job"]):
+        res = django_app.get(url, user=std_user).follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Task is not scheduled."]
 
-            with mock.patch.object(Job, "is_queued") as m:
-                m.return_value = True
-                res = django_app.get(url, user=std_user)
-                res = res.forms[1].submit().follow()
-                msgs = res.context["messages"]
-                assert [m.message for m in msgs] == ["Revoked"]
+        job.queue()
+        res = django_app.get(url, user=std_user)
+        res = res.forms[1].submit().follow()
+        msgs = res.context["messages"]
+        assert [m.message for m in msgs] == ["Revoked"]
+        job.refresh_from_db()
+        assert job.curr_async_result_id is None
 
 
 def test_check_status(request, django_app, std_user, job, queued):

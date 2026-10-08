@@ -1,10 +1,9 @@
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from _pytest.fixtures import SubRequest
 from celery import chain, group, chord
 from celery.worker import WorkController
-from pytest_django.fixtures import SettingsWrapper
 
 from demo.factories import AddToJobFactory, SumJobFactory, ValueJobFactory
 from demo.models import AddToJob, SumJob, ValueJob
@@ -14,7 +13,7 @@ pytest_plugins = ("celery.contrib.pytest",)
 
 
 @pytest.fixture(params=[True, False], ids=["eager", "async"])
-def execution_mode(request: SubRequest, settings: SettingsWrapper) -> None:
+def execution_mode(request: SubRequest, settings: Any) -> None:
     if request.param:
         settings.CELERY_TASK_ALWAYS_EAGER = True
         settings.CELERY_TASK_STORE_EAGER_RESULT = True

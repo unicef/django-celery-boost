@@ -171,7 +171,8 @@ def test_revoke(transactional_db, celery_app, celery_worker, reset_queue):
 
     job1.queue()
     job1.revoke()
-    assert job1.task_status == Job.MISSING
+    assert job1.task_status == Job.NOT_SCHEDULED
+    assert job1.curr_async_result_id is None
 
 
 def test_async_job_standard(transactional_db, celery_app, celery_worker, reset_queue):
