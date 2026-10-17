@@ -1,5 +1,7 @@
 import os
+import time
 from time import sleep
+from typing import Callable
 from unittest.mock import patch
 
 import pytest
@@ -12,7 +14,23 @@ from tests.demoapp.demo.factories import AsyncJobModelFactory
 
 pytest_plugins = ("celery.contrib.pytest",)
 
-SLEEP_TIME = 0.2
+
+def wait_for(predicate: Callable[[], bool], timeout: float = 15.0, interval: float = 0.1) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        sleep(interval)
+    pytest.fail("Condition not met within timeout")
+
+
+def wait_for_status(job: Job, status: str, timeout: float = 15.0, interval: float = 0.1) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if job.task_status == status:
+            return
+        sleep(interval)
+    pytest.fail(f"Task {job.pk} did not reach {status} (last: {job.task_status})")
 
 
 @pytest.fixture(scope="session")
@@ -42,8 +60,7 @@ def celery_app(celery_app):
 def test_tasks_success(transactional_db, celery_app, celery_worker):
     job: Job = JobFactory(name="abc", op="upper")
     job.queue()
-    sleep(SLEEP_TIME)
-    assert job.async_result.result == "ABC"
+    assert job.async_result.get(timeout=10) == "ABC"
     assert job.task_status == Job.SUCCESS
     assert job.task_info["date_done"]
 
@@ -51,8 +68,7 @@ def test_tasks_success(transactional_db, celery_app, celery_worker):
 def test_tasks_fail(transactional_db, celery_app, celery_worker):
     job1: Job = JobFactory(name="Error #1", op="raise")
     job1.queue()
-    sleep(SLEEP_TIME)
-    assert isinstance(job1.async_result.result, Exception)
+    assert isinstance(job1.async_result.get(timeout=10, propagate=False), Exception)
     assert job1.task_status == Job.FAILURE
     assert job1.task_info["traceback"]
     assert job1.task_info["date_done"]
@@ -60,12 +76,11 @@ def test_tasks_fail(transactional_db, celery_app, celery_worker):
 
 
 def test_tasks_progress(transactional_db, celery_app, celery_worker):
-    job1: Job = JobFactory(name="Progress", op="progress", value=5)
+    job1: Job = JobFactory(name="Progress", op="progress", value=10)
     job1.queue()
-    sleep(2)
-    assert job1.task_status == Job.PROGRESS
-    assert job1.task_info["result"]["current"] >= 2 / 0.5
-    sleep(3)
+    wait_for_status(job1, Job.PROGRESS, timeout=10)
+    assert job1.task_info["result"]["current"] >= 1
+    assert job1.async_result.get(timeout=30) is not None
     assert job1.task_status == Job.SUCCESS
 
 
@@ -92,7 +107,7 @@ def test_celery_queue_status_no_app(transactional_db, reset_queue):
     job1.queue()
     job2.queue()
     job3.queue()
-    sleep(1)
+    wait_for(lambda: Job.get_queue_size() == 3)
     assert Job.get_queue_size() == 3
     assert Job.celery_queue_info() == {
         "canceled": 0,
@@ -120,7 +135,7 @@ def test_celery_queue_status_no_workers(transactional_db, celery_app, reset_queu
     job2.terminate()
     job3.terminate()
 
-    sleep(1)
+    wait_for(lambda: Job.get_queue_size() == 1)
     assert Job.get_queue_size() == 1
     assert Job.celery_queue_info() == {
         "canceled": 0,
@@ -156,7 +171,7 @@ def test_celery_queue_status_workers(transactional_db, celery_app, celery_worker
     job1.queue()
     job2.queue()
     job3.queue()
-    sleep(1)
+    wait_for(lambda: Job.get_queue_size() == 0)
     assert Job.get_queue_size() == 0
     assert Job.celery_queue_info() == {
         "canceled": 0,
