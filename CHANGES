@@ -1,11 +1,29 @@
-0.7.0
+0.9.0
 ----------
 * Breaking: `revoke()` now clears `curr_async_result_id` and detaches the AsyncResult (returning `NOT_SCHEDULED`) after broadcasting the revoke, so a task stuck in `STARTED` after worker loss can be queued again
+* Breaking: `revoke()` now returns the resulting task status instead of `None`
 * Admin Revoke and Terminate actions are no longer limited to tasks present in the Redis queue; they are available for any scheduled task
-* add Django 6.0 to the test matrix
+* `terminate()` now clears `curr_async_result_id` for running (STARTED) tasks, so the record is detached after termination
+* Flower address is resolved from `CELERY_BOOST_FLOWER` (canonical) or the deprecated `CELERY_FLOW_ADDRESS` alias, defaulting to `/flower`; relative paths are resolved against the current request
+* add `django_celery_boost.context_processors.flower` to expose `flower_addr` in every template
+* add "Concurrency and locks" documentation page with the worker-loss recovery recipe
 * Breaking: drop Django 4.2 and Python 3.11/3.12 support; require Python 3.13+
-* add Django 6.1 to the test matrix
+* add Django 6.0 and 6.1 to the test matrix (Python 3.14)
 * make Celery timing tests deterministic and add pytest-rerunfailures as a safety net
+
+0.8
+---
+* graceful cancelation and progress tracking
+
+0.7
+---
+* Fix AsyncResult with Celery app
+* Add canvas support
+
+
+0.6.2
+-----
+* Create AsyncResult with Celery app
 
 0.6.1
 ---
